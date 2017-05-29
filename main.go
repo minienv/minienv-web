@@ -7,9 +7,10 @@ import (
 	"strconv"
 	"encoding/json"
 	"io/ioutil"
-	"crypto/tls"
+	"strings"
 )
 
+var deployments map[string]*Deployment = make(map[string]*Deployment)
 var exampleDeploymentTemplate string
 var exampleServiceTemplate string
 var kubeServiceProtocol string
@@ -18,10 +19,11 @@ var kubeServicePort string
 var kubeServiceToken string
 var kubeServiceBaseUrl string
 
-var VAR_DEPLOYMENT_NAME string = "$deploymentName"
-var VAR_APP_LABEL string = "$appLabel"
-var VAR_EDITOR_PORT string = "$editorPort"
-var VAR_PROXY_PORT string = "$proxyPort"
+type Deployment struct {
+	UserId string
+	UpRequest *UpRequest
+	UpResponse *UpResponse
+}
 
 type PingRequest struct {
 	UserId string `json:"userId"`
@@ -37,11 +39,7 @@ type UpRequest struct {
 }
 
 type UpResponse struct {
-	NodeHostName string `json:"nodeHostName"`
-	EditorPort int `json:"editorPort"`
 	EditorUrl string `json:"editorUrl"`
-	ProxyPort int `json:"proxyPort"`
-	DockerComposePorts []int `json:"dockerComposePorts"`
 	DockerComposeUrls []string `json:"dockerComposeUrls"`
 }
 
@@ -78,40 +76,41 @@ func up(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 400)
 		return
 	}
+	// create response
+	var upResponse *UpResponse
 	// call kubernetes
-	url := kubeServiceBaseUrl + "/apis/apps/v1beta1/namespaces/default/deployments"
-	log.Printf("KUBE URL = %s\n", url)
-	// mw:FIX THIS
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{Transport: tr}
-	req, err := http.NewRequest("GET", url, nil)
-	if len(kubeServiceToken) > 0 {
-		log.Printf("Authorization=Bearer %s\n", kubeServiceToken)
-		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
-	}
-	resp, err := client.Do(req)
+	log.Printf("Checking if deployment exists for user '%s'...\n", upRequest.UserId)
+	exists, err := isExampleDeployed(upRequest.UserId, kubeServiceToken, kubeServiceBaseUrl)
 	if err != nil {
-		log.Print("Error making request: ", err)
 		http.Error(w, err.Error(), 400)
 		return
+	} else if exists {
+		log.Printf("Example deployed for user '%s'.\n", upRequest.UserId)
+		deployment, ok := deployments[upRequest.UserId]
+		if ! ok || ! strings.EqualFold(upRequest.Repo, deployment.UpRequest.Repo) {
+			log.Printf("Repo changed, deleting deployment for userId '%s'...\n", upRequest.UserId)
+			deleteExample(upRequest.UserId, kubeServiceToken, kubeServiceBaseUrl)
+		} else {
+			log.Println("Returning existing deployment details...")
+			upResponse = deployment.UpResponse
+		}
 	}
-	defer resp.Body.Close()
-	_, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Print("Error reading response: ", err)
-		http.Error(w, err.Error(), 400)
-		return
+	if upResponse == nil  {
+		log.Println("Creating new deployment...")
+		details, err := deployExample(upRequest.UserId, upRequest.Repo, exampleDeploymentTemplate, exampleServiceTemplate, kubeServiceToken, kubeServiceBaseUrl)
+		if err != nil {
+			log.Print("Error creating deployment: ", err)
+			http.Error(w, err.Error(), 400)
+			return
+		} else {
+			upResponse = &UpResponse{}
+			upResponse.EditorUrl = details.EditorUrl
+			upResponse.DockerComposeUrls = details.DockerComposeUrls
+			deployments[upRequest.UserId] = &Deployment{upRequest.UserId, &upRequest, upResponse}
+		}
 	}
-	//w.Header().Set("Content-Type", "application/json")
-	//w.Write(body)
-
-	var upResponse = UpResponse{}
-	upResponse.NodeHostName = "minikube.dev"
-	upResponse.EditorUrl = "http://localhost:8082"
-	upResponse.DockerComposeUrls = []string{"http://33000.minikube.dev:31879", "http://38080.minikube.dev:31879"}
-	err = json.NewEncoder(w).Encode(&upResponse)
+	// return response
+	err = json.NewEncoder(w).Encode(upResponse)
 	if err != nil {
 		log.Print("Error encoding response: ", err)
 		http.Error(w, err.Error(), 400)
