@@ -1,0 +1,72 @@
+html, body {
+	height: 100%;
+	padding: 0px;
+	margin: 0px;
+	overflow: hidden;
+}
+
+#app {
+	height: 100%;
+}
+
+#main-container {
+	height: 100%;
+	padding: 30px;
+	float: left;
+}
+
+#proxy-container {
+	height: 100%;
+	padding: 0px;
+	margin: 0px;
+	float: left;
+}
+
+#dc-iframe-container {
+	height: 100%;
+	padding: 0px;
+	margin: 0px;
+}
+
+#editor-container {
+	height: 100%;
+	padding: 0px;
+	margin: 0px;
+	float: left;
+}
+
+.gutter {
+	background-color: #eee;
+	background-repeat: no-repeat;
+	background-position: 50%;
+}
+
+.gutter.gutter-horizontal {
+	background-image: url('/img/grip_vertical.png');
+	cursor: ew-resize;
+}
+
+.gutter.gutter-vertical {
+	background-image: url('/img/grip_horizontal.png');
+	cursor: ns-resize;
+}
+
+.split {
+	-webkit-box-sizing: border-box;
+	-moz-box-sizing: border-box;
+	box-sizing: border-box;
+}
+
+.split, .gutter.gutter-horizontal {
+	float: left;
+	height: 100%;
+}
+
+.gutter.gutter-vertical {
+	height: 10px;
+}
+
+.split {
+	overflow-y: auto;
+	overflow-x: auto;
+}

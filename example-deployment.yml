@@ -1,0 +1,32 @@
+apiVersion: apps/v1beta1
+kind: Deployment 
+metadata:
+  name: $deploymentName
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: $appLabel
+    spec:
+      containers:
+        - name: exampleup
+          image: localhost:30005/markwatsonatx/exampleup:latest
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "250m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          securityContext:
+            privileged: true
+          env:
+          - name: EXUP_REGISTRY_MIRROR
+            value: "http://dregsvc2:5000"
+          - name: EXUP_EDITOR_PORT
+            value: $editorPort
+          - name: EXUP_PROXY_PORT
+            value: $proxyPort
+          - name: EXUP_GIT_REPO
+            value: "$gitRepo"
