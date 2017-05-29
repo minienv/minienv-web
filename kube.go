@@ -8,6 +8,11 @@ import (
 	"crypto/tls"
 	"strings"
 	"fmt"
+
+	"gopkg.in/yaml.v2"
+	"io/ioutil"
+	"reflect"
+	"strconv"
 )
 
 var VAR_SERVICE_NAME string = "$serviceName"
@@ -244,6 +249,35 @@ func deleteExample(userId string, kubeServiceToken string, kubeServiceBaseUrl st
 }
 
 func deployExample(userId string, gitRepo string, deploymentTemplate string, serviceTemplate string, kubeServiceToken string, kubeServiceBaseUrl string) (*DeploymentDetails, error) {
+	// download docker-compose yaml
+	dockerComposePorts := []int{}
+	url := fmt.Sprintf("%s/raw/master/docker-compose.yml", gitRepo)
+	log.Printf("Downloading docker-compose file from '%s'...\n", url)
+	client := getHttpClient()
+	req, err := http.NewRequest("GET", url, nil)
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("Error downloading docker-compose file: ", err)
+		return nil, err
+	} else {
+		m := make(map[interface{}]interface{})
+		data, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Println("Error downloading docker-compose file: ", err)
+			return nil, err
+		} else {
+			err = yaml.Unmarshal(data, &m)
+			if err != nil {
+				log.Println("Error parsing docker-compose file: ", err)
+				return nil, err
+			} else {
+				for k, v := range m {
+					getDockerComposePorts(v, &dockerComposePorts, k.(string))
+				}
+			}
+		}
+	}
+	//
 	var deploymentName = getDeploymentName(userId)
 	var appLabel = getAppLabel(userId)
 	deployment := deploymentTemplate
@@ -252,7 +286,7 @@ func deployExample(userId string, gitRepo string, deploymentTemplate string, ser
 	deployment = strings.Replace(deployment, VAR_PROXY_PORT, DEFAULT_PROXY_PORT, -1)
 	deployment = strings.Replace(deployment, VAR_EDITOR_PORT, DEFAULT_EDITOR_PORT, -1)
 	deployment = strings.Replace(deployment, VAR_GIT_REPO, gitRepo, -1)
-	_, err := saveDeployment(deployment, kubeServiceToken, kubeServiceBaseUrl)
+	_, err = saveDeployment(deployment, kubeServiceToken, kubeServiceBaseUrl)
 	if err != nil {
 		log.Println("Error saving deployment: ", err)
 		return nil, err
@@ -285,7 +319,7 @@ func deployExample(userId string, gitRepo string, deploymentTemplate string, ser
 			details.EditorPort = editorNodePort
 			details.EditorUrl = fmt.Sprintf("http://%s:%d", details.NodeHostName, details.EditorPort)
 			details.ProxyPort = proxyNodePort
-			details.DockerComposePorts = []int{33000,38080}
+			details.DockerComposePorts = dockerComposePorts
 			for _, element := range details.DockerComposePorts {
 				details.DockerComposeUrls = append(details.DockerComposeUrls, fmt.Sprintf("http://%d.%s:%d",element,details.NodeHostName,details.ProxyPort))
 			}
@@ -294,6 +328,35 @@ func deployExample(userId string, gitRepo string, deploymentTemplate string, ser
 	}
 }
 
+
+func getDockerComposePorts(v interface{}, ports *[]int, parent string) {
+	typ := reflect.TypeOf(v).Kind()
+	if typ == reflect.String {
+		if parent == "ports" {
+			portString := strings.SplitN(v.(string), ":", 2)[0]
+			port, err := strconv.Atoi(portString)
+			if err == nil {
+				*ports = append(*ports, port)
+			}
+		}
+	} else if typ == reflect.Slice {
+		getDockerComposePortsSlice(v.([]interface{}), ports, parent)
+	} else if typ == reflect.Map {
+		getDockerComposePortsMap(v.(map[interface{}]interface{}), ports)
+	}
+}
+
+func getDockerComposePortsMap(m map[interface{}]interface{}, ports *[]int) {
+	for k, v := range m {
+		getDockerComposePorts(v, ports, strings.ToLower(k.(string)))
+	}
+}
+
+func getDockerComposePortsSlice(slc []interface{}, ports *[]int, parent string) {
+	for _, v := range slc {
+		getDockerComposePorts(v, ports, parent)
+	}
+}
 
 func getServiceName(userId string) string {
 	return strings.ToLower(fmt.Sprintf("u-%s-service", userId))
