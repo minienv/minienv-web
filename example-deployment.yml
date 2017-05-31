@@ -23,7 +23,7 @@ spec:
             privileged: true
           env:
           - name: EXUP_REGISTRY_MIRROR
-            value: "http://dregsvc2:5000"
+            value: "http://exampleup-registry-svc2:5000"
           - name: EXUP_EDITOR_PORT
             value: "$editorPort"
           - name: EXUP_PROXY_PORT
