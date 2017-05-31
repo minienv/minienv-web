@@ -1,18 +1,19 @@
 package main
 
 import (
+	"crypto/tls"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
-	"encoding/json"
-	"crypto/tls"
-	"strings"
-	"fmt"
-
-	"gopkg.in/yaml.v2"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"strconv"
+	"strings"
+
+	"gopkg.in/yaml.v2"
 )
 
 var VAR_SERVICE_NAME string = "$serviceName"
@@ -78,7 +79,7 @@ func getHttpClient() *http.Client {
 }
 
 func getDeployment(name string, kubeServiceToken string, kubeServiceBaseUrl string) (*GetDeploymentResponse, error) {
-	url := fmt.Sprintf("%s/apis/apps/v1beta1/namespaces/default/deployments/%s", kubeServiceBaseUrl, name)
+	url := fmt.Sprintf("%s/apis/extensions/v1beta1/namespaces/default/deployments/%s", kubeServiceBaseUrl, name)
 	client := getHttpClient()
 	req, err := http.NewRequest("GET", url, nil)
 	if len(kubeServiceToken) > 0 {
@@ -103,7 +104,7 @@ func getDeployment(name string, kubeServiceToken string, kubeServiceBaseUrl stri
 }
 
 func saveDeployment(yaml string, kubeServiceToken string, kubeServiceBaseUrl string) (*SaveDeploymentResponse, error) {
-	url := fmt.Sprintf("%s/apis/apps/v1beta1/namespaces/default/deployments", kubeServiceBaseUrl)
+	url := fmt.Sprintf("%s/apis/extensions/v1beta1/namespaces/default/deployments", kubeServiceBaseUrl)
 	//log.Printf("POST %s\n%s\n", url, yaml)
 	client := getHttpClient()
 	req, err := http.NewRequest("POST", url, strings.NewReader(yaml))
@@ -130,7 +131,7 @@ func saveDeployment(yaml string, kubeServiceToken string, kubeServiceBaseUrl str
 }
 
 func deleteDeployment(name string, kubeServiceToken string, kubeServiceBaseUrl string) (bool, error) {
-	url := fmt.Sprintf("%s/apis/apps/v1beta1/namespaces/default/deployments/%s", kubeServiceBaseUrl, name)
+	url := fmt.Sprintf("%s/apis/extensions/v1beta1/namespaces/default/deployments/%s", kubeServiceBaseUrl, name)
 	client := getHttpClient()
 	req, err := http.NewRequest("DELETE", url, nil)
 	if len(kubeServiceToken) > 0 {
@@ -315,7 +316,7 @@ func deployExample(userId string, gitRepo string, deploymentTemplate string, ser
 				// element is the element from someSlice for where we are
 			}
 			details := &DeploymentDetails{}
-			details.NodeHostName = "minikube.dev" // mw:TODO
+			details.NodeHostName = os.Getenv("EXUP_NODE_HOST_NAME") // mw:TODO
 			details.EditorPort = editorNodePort
 			details.EditorUrl = fmt.Sprintf("http://%s:%d", details.NodeHostName, details.EditorPort)
 			details.ProxyPort = proxyNodePort
