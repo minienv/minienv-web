@@ -22,8 +22,12 @@ spec:
           securityContext:
             privileged: true
           env:
+          - name: EXUP_STORAGE_DRIVER
+            value: "aufs"
           - name: EXUP_REGISTRY_MIRROR
             value: "http://exampleup-registry-svc2:5000"
+          - name: EXUP_LOG_PORT
+            value: "$logPort"
           - name: EXUP_EDITOR_PORT
             value: "$editorPort"
           - name: EXUP_PROXY_PORT

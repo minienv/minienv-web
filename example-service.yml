@@ -7,6 +7,9 @@ spec:
     app: $appLabel
   ports:
     - protocol: TCP
+      port: $logPort
+      name: "log"
+    - protocol: TCP
       port: $editorPort
       name: "editor"
     - protocol: TCP

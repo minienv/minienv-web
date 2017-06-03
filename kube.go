@@ -19,12 +19,14 @@ import (
 var VAR_SERVICE_NAME string = "$serviceName"
 var VAR_DEPLOYMENT_NAME string = "$deploymentName"
 var VAR_APP_LABEL string = "$appLabel"
+var VAR_LOG_PORT string = "$logPort"
 var VAR_EDITOR_PORT string = "$editorPort"
 var VAR_PROXY_PORT string = "$proxyPort"
 var VAR_GIT_REPO string = "$gitRepo"
 
-var DEFAULT_PROXY_PORT string = "30081"
+var DEFAULT_LOG_PORT string = "30081"
 var DEFAULT_EDITOR_PORT string = "30082"
+var DEFAULT_PROXY_PORT string = "30083"
 
 type GetDeploymentResponse struct {
 	Kind string `json:"kind"`
@@ -62,6 +64,8 @@ type DeleteServiceResponse struct {
 
 type DeploymentDetails struct {
 	NodeHostName string
+	LogPort int
+	LogUrl string
 	EditorPort int
 	EditorUrl string
 	ProxyPort int
@@ -284,8 +288,9 @@ func deployExample(userId string, gitRepo string, deploymentTemplate string, ser
 	deployment := deploymentTemplate
 	deployment = strings.Replace(deployment, VAR_DEPLOYMENT_NAME, deploymentName, -1)
 	deployment = strings.Replace(deployment, VAR_APP_LABEL, appLabel, -1)
-	deployment = strings.Replace(deployment, VAR_PROXY_PORT, DEFAULT_PROXY_PORT, -1)
+	deployment = strings.Replace(deployment, VAR_LOG_PORT, DEFAULT_LOG_PORT, -1)
 	deployment = strings.Replace(deployment, VAR_EDITOR_PORT, DEFAULT_EDITOR_PORT, -1)
+	deployment = strings.Replace(deployment, VAR_PROXY_PORT, DEFAULT_PROXY_PORT, -1)
 	deployment = strings.Replace(deployment, VAR_GIT_REPO, gitRepo, -1)
 	_, err = saveDeployment(deployment, kubeServiceToken, kubeServiceBaseUrl)
 	if err != nil {
@@ -297,16 +302,21 @@ func deployExample(userId string, gitRepo string, deploymentTemplate string, ser
 		service := serviceTemplate
 		service = strings.Replace(service, VAR_SERVICE_NAME, serviceName, -1)
 		service = strings.Replace(service, VAR_APP_LABEL, appLabel, -1)
-		service = strings.Replace(service, VAR_PROXY_PORT, DEFAULT_PROXY_PORT, -1)
+		service = strings.Replace(service, VAR_LOG_PORT, DEFAULT_LOG_PORT, -1)
 		service = strings.Replace(service, VAR_EDITOR_PORT, DEFAULT_EDITOR_PORT, -1)
+		service = strings.Replace(service, VAR_PROXY_PORT, DEFAULT_PROXY_PORT, -1)
 		serviceResp, err := saveService(service, kubeServiceToken, kubeServiceBaseUrl)
 		if err != nil {
 			log.Println("Error saving service: ", err)
 			return nil, err
 		} else {
+			logNodePort := 0
 			editorNodePort := 0
 			proxyNodePort := 0
 			for _, element := range serviceResp.Spec.Ports {
+				if element.Name == "log" {
+					logNodePort = element.NodePort
+				}
 				if element.Name == "editor" {
 					editorNodePort = element.NodePort
 				}
@@ -317,6 +327,8 @@ func deployExample(userId string, gitRepo string, deploymentTemplate string, ser
 			}
 			details := &DeploymentDetails{}
 			details.NodeHostName = os.Getenv("EXUP_NODE_HOST_NAME") // mw:TODO
+			details.LogPort = logNodePort
+			details.LogUrl = fmt.Sprintf("http://%s:%d", details.NodeHostName, details.LogPort)
 			details.EditorPort = editorNodePort
 			details.EditorUrl = fmt.Sprintf("http://%s:%d", details.NodeHostName, details.EditorPort)
 			details.ProxyPort = proxyNodePort
