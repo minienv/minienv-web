@@ -22,10 +22,12 @@ spec:
           securityContext:
             privileged: true
           env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
           - name: EXUP_STORAGE_DRIVER
             value: "aufs"
-          - name: EXUP_REGISTRY_MIRROR
-            value: "http://exampleup-registry-svc2:5000"
           - name: EXUP_LOG_PORT
             value: "$logPort"
           - name: EXUP_EDITOR_PORT
