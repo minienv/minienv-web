@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -60,6 +61,55 @@ type DeleteDeploymentResponse struct {
 	Kind string `json:"kind"`
 }
 
+type GetReplicaSetsResponse struct {
+	Kind string `json:"kind"`
+	Items []*GetReplicaSetsItems `json:"items"`
+}
+
+type GetReplicaSetsItems struct {
+	Metadata *GetReplicaSetsItemMetadata `json:"metadata"`
+}
+
+type GetReplicaSetsItemMetadata struct {
+	Name string `json:"name"`
+	Labels *GetReplicaSetsItemMetadataLabel `json:"labels"`
+}
+
+type GetReplicaSetsItemMetadataLabel struct {
+	App string `josn:"app"`
+}
+
+type DeleteReplicaSetBody struct {
+	Kind string `json:"kind"`
+	OrphanDependents bool `json:"orphanDependents"`
+}
+
+type DeleteReplicaSetResponse struct {
+	Kind string `json:"kind"`
+}
+
+type GetPodsResponse struct {
+	Kind string `json:"kind"`
+	Items []*GetPodsItems `json:"items"`
+}
+
+type GetPodsItems struct {
+	Metadata *GetPodsItemMetadata `json:"metadata"`
+}
+
+type GetPodsItemMetadata struct {
+	Name string `json:"name"`
+	Labels *GetPodsItemMetadataLabel `json:"labels"`
+}
+
+type GetPodsItemMetadataLabel struct {
+	App string `josn:"app"`
+}
+
+type DeletePodResponse struct {
+	Kind string `json:"kind"`
+}
+
 type GetServiceResponse struct {
 	Kind string `json:"kind"`
 }
@@ -107,7 +157,6 @@ func getPersistentVolume(name string, kubeServiceToken string, kubeServiceBaseUr
 	client := getHttpClient()
 	req, err := http.NewRequest("GET", url, nil)
 	if len(kubeServiceToken) > 0 {
-		log.Printf("Authorization=Bearer %s\n", kubeServiceToken)
 		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
 	}
 	resp, err := client.Do(req)
@@ -129,17 +178,15 @@ func getPersistentVolume(name string, kubeServiceToken string, kubeServiceBaseUr
 
 func savePersistentVolume(yaml string, kubeServiceToken string, kubeServiceBaseUrl string) (*SavePersistentVolumeResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/persistentvolumes", kubeServiceBaseUrl)
-	//log.Printf("POST %s\n%s\n", url, yaml)
 	client := getHttpClient()
 	req, err := http.NewRequest("POST", url, strings.NewReader(yaml))
 	req.Header.Add("Content-Type", "application/yaml")
 	if len(kubeServiceToken) > 0 {
-		log.Printf("Authorization=Bearer %s\n", kubeServiceToken)
 		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Print("Error saving service: ", err)
+		log.Print("Error saving persistent volume: ", err)
 		return nil, err
 	} else {
 		var savePersistentVolumeResp SavePersistentVolumeResponse
@@ -159,7 +206,6 @@ func getPersistentVolumeClaim(name string, kubeServiceToken string, kubeServiceB
 	client := getHttpClient()
 	req, err := http.NewRequest("GET", url, nil)
 	if len(kubeServiceToken) > 0 {
-		log.Printf("Authorization=Bearer %s\n", kubeServiceToken)
 		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
 	}
 	resp, err := client.Do(req)
@@ -181,17 +227,15 @@ func getPersistentVolumeClaim(name string, kubeServiceToken string, kubeServiceB
 
 func savePersistentVolumeClaim(yaml string, kubeServiceToken string, kubeServiceBaseUrl string) (*SavePersistentVolumeClaimResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/namespaces/default/persistentvolumeclaims", kubeServiceBaseUrl)
-	//log.Printf("POST %s\n%s\n", url, yaml)
 	client := getHttpClient()
 	req, err := http.NewRequest("POST", url, strings.NewReader(yaml))
 	req.Header.Add("Content-Type", "application/yaml")
 	if len(kubeServiceToken) > 0 {
-		log.Printf("Authorization=Bearer %s\n", kubeServiceToken)
 		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Print("Error saving service: ", err)
+		log.Print("Error saving persistent volume claim: ", err)
 		return nil, err
 	} else {
 		var savePersistentVolumeClaimResp SavePersistentVolumeClaimResponse
@@ -211,7 +255,6 @@ func getDeployment(name string, kubeServiceToken string, kubeServiceBaseUrl stri
 	client := getHttpClient()
 	req, err := http.NewRequest("GET", url, nil)
 	if len(kubeServiceToken) > 0 {
-		log.Printf("Authorization=Bearer %s\n", kubeServiceToken)
 		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
 	}
 	resp, err := client.Do(req)
@@ -233,12 +276,10 @@ func getDeployment(name string, kubeServiceToken string, kubeServiceBaseUrl stri
 
 func saveDeployment(yaml string, kubeServiceToken string, kubeServiceBaseUrl string) (*SaveDeploymentResponse, error) {
 	url := fmt.Sprintf("%s/apis/extensions/v1beta1/namespaces/default/deployments", kubeServiceBaseUrl)
-	//log.Printf("POST %s\n%s\n", url, yaml)
 	client := getHttpClient()
 	req, err := http.NewRequest("POST", url, strings.NewReader(yaml))
 	req.Header.Add("Content-Type", "application/yaml")
 	if len(kubeServiceToken) > 0 {
-		log.Printf("Authorization=Bearer %s\n", kubeServiceToken)
 		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
 	}
 	resp, err := client.Do(req)
@@ -259,11 +300,11 @@ func saveDeployment(yaml string, kubeServiceToken string, kubeServiceBaseUrl str
 }
 
 func deleteDeployment(name string, kubeServiceToken string, kubeServiceBaseUrl string) (bool, error) {
+	log.Printf("Deleting deployment '%s'...\n", name)
 	url := fmt.Sprintf("%s/apis/extensions/v1beta1/namespaces/default/deployments/%s", kubeServiceBaseUrl, name)
 	client := getHttpClient()
 	req, err := http.NewRequest("DELETE", url, nil)
 	if len(kubeServiceToken) > 0 {
-		log.Printf("Authorization=Bearer %s\n", kubeServiceToken)
 		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
 	}
 	resp, err := client.Do(req)
@@ -281,12 +322,179 @@ func deleteDeployment(name string, kubeServiceToken string, kubeServiceBaseUrl s
 	}
 }
 
+func getReplicaSets(kubeServiceToken string, kubeServiceBaseUrl string) (*GetReplicaSetsResponse, error) {
+	url := fmt.Sprintf("%s/apis/extensions/v1beta1/namespaces/default/replicasets", kubeServiceBaseUrl)
+	client := getHttpClient()
+	req, err := http.NewRequest("GET", url, nil)
+	if len(kubeServiceToken) > 0 {
+		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("Error getting replica sets: ", err)
+		return nil, err
+	} else {
+		var getReplicaSetsResponse GetReplicaSetsResponse
+		err := json.NewDecoder(resp.Body).Decode(&getReplicaSetsResponse)
+		if err != nil {
+			return nil, err
+		} else if getReplicaSetsResponse.Kind != "ReplicaSetList" {
+			return nil, nil
+		} else {
+			return &getReplicaSetsResponse, nil
+		}
+	}
+}
+
+func getReplicaSetName(label string, kubeServiceToken string, kubeServiceBaseUrl string) (string, error) {
+	log.Printf("Getting replica set name for label '%s'...\n", label)
+	getReplicaSetsResponse, err := getReplicaSets(kubeServiceToken, kubeServiceBaseUrl)
+	if err != nil {
+		return "", err
+	} else {
+		if getReplicaSetsResponse.Items != nil && len(getReplicaSetsResponse.Items) > 0 {
+			for _, element := range getReplicaSetsResponse.Items {
+				if element.Metadata != nil && element.Metadata.Labels != nil && element.Metadata.Labels.App == label {
+					log.Printf("Replica set name for label '%s' = '%s'\n", label, element.Metadata.Name)
+					return element.Metadata.Name, nil
+				}
+			}
+		}
+		return "", nil
+	}
+}
+
+func deleteReplicaSet(label string, kubeServiceToken string, kubeServiceBaseUrl string) (bool, error) {
+	log.Printf("Deleting replica set for label '%s'...\n", label)
+	name, err := getReplicaSetName(label, kubeServiceToken, kubeServiceBaseUrl)
+	if err != nil {
+		log.Println("Error deleting replica set: ", err)
+		return false, err
+	} else if name == "" {
+		return false, nil
+	}
+	// delete replica set
+	log.Printf("Deleting replica set '%s'...\n", name)
+	url := fmt.Sprintf("%s/apis/extensions/v1beta1/namespaces/default/replicasets/%s", kubeServiceBaseUrl, name)
+	client := getHttpClient()
+	body := &DeleteReplicaSetBody{Kind: "DeleteOptions", OrphanDependents: false}
+	b := new(bytes.Buffer)
+	json.NewEncoder(b).Encode(body)
+	req, err := http.NewRequest("DELETE", url, b)
+	req.Header.Add("Content-Type", "application/json")
+	if len(kubeServiceToken) > 0 {
+		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("Error deleting replica set: ", err)
+		return false, err
+	} else {
+		var deleteReplicaSetResp DeleteReplicaSetResponse
+		err := json.NewDecoder(resp.Body).Decode(&deleteReplicaSetResp)
+		if err != nil {
+			return false, err
+		} else {
+			return deleteReplicaSetResp.Kind == "ReplicaSet", nil
+		}
+	}
+}
+
+func getPods(kubeServiceToken string, kubeServiceBaseUrl string) (*GetPodsResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/namespaces/default/pods", kubeServiceBaseUrl)
+	client := getHttpClient()
+	req, err := http.NewRequest("GET", url, nil)
+	if len(kubeServiceToken) > 0 {
+		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("Error getting pods: ", err)
+		return nil, err
+	} else {
+		var getPodsResponse GetPodsResponse
+		err := json.NewDecoder(resp.Body).Decode(&getPodsResponse)
+		if err != nil {
+			return nil, err
+		} else if getPodsResponse.Kind != "PodList" {
+			return nil, nil
+		} else {
+			return &getPodsResponse, nil
+		}
+	}
+}
+
+func getPodName(label string, kubeServiceToken string, kubeServiceBaseUrl string) (string, error) {
+	log.Printf("Getting pod name for label '%s'...\n", label)
+	getPodsResponse, err := getPods(kubeServiceToken, kubeServiceBaseUrl)
+	if err != nil {
+		return "", err
+	} else {
+		if getPodsResponse.Items != nil && len(getPodsResponse.Items) > 0 {
+			for _, element := range getPodsResponse.Items {
+				if element.Metadata != nil && element.Metadata.Labels != nil && element.Metadata.Labels.App == label {
+					log.Printf("Pod name for label '%s' = '%s'\n", label, element.Metadata.Name)
+					return element.Metadata.Name, nil
+				}
+			}
+		}
+		return "", nil
+	}
+}
+
+func deletePod(label string, kubeServiceToken string, kubeServiceBaseUrl string) (bool, error) {
+	log.Printf("Deleting pod for label '%s'...\n", label)
+	name, err := getPodName(label, kubeServiceToken, kubeServiceBaseUrl)
+	if err != nil {
+		log.Println("Error deleting pod: ", err)
+		return false, err
+	} else if name == "" {
+		return false, nil
+	}
+	// delete pod
+	log.Printf("Deleting pod '%s'...\n", name)
+	url := fmt.Sprintf("%s/api/v1/namespaces/default/pods/%s", kubeServiceBaseUrl, name)
+	client := getHttpClient()
+	req, err := http.NewRequest("DELETE", url, nil)
+	if len(kubeServiceToken) > 0 {
+		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("Error deleting pod: ", err)
+		return false, err
+	} else {
+		var deletePodResp DeletePodResponse
+		err := json.NewDecoder(resp.Body).Decode(&deletePodResp)
+		if err != nil {
+			return false, err
+		} else {
+			return deletePodResp.Kind == "Pod", nil
+		}
+	}
+}
+
+func waitForPodTermination(label string, kubeServiceToken string, kubeServiceBaseUrl string) (bool, error) {
+	log.Printf("Waiting for pod termination for label '%s'...\n", label)
+	i := 0
+	for i < 9 {
+		time.Sleep(5 *time.Second)
+		name, err := getPodName(label, kubeServiceToken, kubeServiceBaseUrl)
+		if err != nil {
+			log.Println("Error waiting for pod termination: ", err)
+			return false, err
+		} else if name == "" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func getService(name string, kubeServiceToken string, kubeServiceBaseUrl string) (*GetServiceResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/namespaces/default/services/%s", kubeServiceBaseUrl, name)
 	client := getHttpClient()
 	req, err := http.NewRequest("GET", url, nil)
 	if len(kubeServiceToken) > 0 {
-		log.Printf("Authorization=Bearer %s\n", kubeServiceToken)
 		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
 	}
 	resp, err := client.Do(req)
@@ -308,12 +516,10 @@ func getService(name string, kubeServiceToken string, kubeServiceBaseUrl string)
 
 func saveService(yaml string, kubeServiceToken string, kubeServiceBaseUrl string) (*SaveServiceResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/namespaces/default/services", kubeServiceBaseUrl)
-	//log.Printf("POST %s\n%s\n", url, yaml)
 	client := getHttpClient()
 	req, err := http.NewRequest("POST", url, strings.NewReader(yaml))
 	req.Header.Add("Content-Type", "application/yaml")
 	if len(kubeServiceToken) > 0 {
-		log.Printf("Authorization=Bearer %s\n", kubeServiceToken)
 		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
 	}
 	resp, err := client.Do(req)
@@ -326,7 +532,7 @@ func saveService(yaml string, kubeServiceToken string, kubeServiceBaseUrl string
 		if err != nil {
 			return nil, err
 		} else if saveServiceResp.Kind != "Service" {
-			return nil, errors.New("Unable to create service")
+			return nil, errors.New("Unable to create service: " + saveServiceResp.Kind)
 		} else {
 			return &saveServiceResp, nil
 		}
@@ -334,11 +540,11 @@ func saveService(yaml string, kubeServiceToken string, kubeServiceBaseUrl string
 }
 
 func deleteService(name string, kubeServiceToken string, kubeServiceBaseUrl string) (bool, error) {
+	log.Printf("Deleting service '%s'...\n", name)
 	url := fmt.Sprintf("%s/api/v1/namespaces/default/services/%s", kubeServiceBaseUrl, name)
 	client := getHttpClient()
 	req, err := http.NewRequest("DELETE", url, nil)
 	if len(kubeServiceToken) > 0 {
-		log.Printf("Authorization=Bearer %s\n", kubeServiceToken)
 		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
 	}
 	resp, err := client.Do(req)
@@ -365,19 +571,21 @@ func isExampleDeployed(userId string, kubeServiceToken string, kubeServiceBaseUr
 	}
 }
 
-func deleteExample(userId string, kubeServiceToken string, kubeServiceBaseUrl string) (error) {
-	_, err := deleteDeployment(getDeploymentName(userId), kubeServiceToken, kubeServiceBaseUrl)
-	_, err2 := deleteService(getServiceName(userId), kubeServiceToken, kubeServiceBaseUrl)
-	if err != nil {
-		return err
-	} else if err2 != nil {
-		return err2
-	} else {
-		return nil
-	}
+func deleteExample(userId string, kubeServiceToken string, kubeServiceBaseUrl string) {
+	log.Printf("Deleting example for user '%s'...\n", userId)
+	deploymentName := getDeploymentName(userId)
+	appLabel := getAppLabel(userId)
+	serviceName := getServiceName(userId)
+	_, _ = deleteDeployment(deploymentName, kubeServiceToken, kubeServiceBaseUrl)
+	_, _ = deleteReplicaSet(appLabel, kubeServiceToken, kubeServiceBaseUrl)
+	//_, _ = deletePod(appLabel, kubeServiceToken, kubeServiceBaseUrl)
+	_, _ = deleteService(serviceName, kubeServiceToken, kubeServiceBaseUrl)
+	_, _ = waitForPodTermination(appLabel, kubeServiceToken, kubeServiceBaseUrl)
 }
 
 func deployExample(userId string, gitRepo string, pvTemplate string, pvcTemplate string, deploymentTemplate string, serviceTemplate string, kubeServiceToken string, kubeServiceBaseUrl string) (*DeploymentDetails, error) {
+	// delete example, if it exists
+	deleteExample(userId, kubeServiceToken, kubeServiceBaseUrl)
 	// download docker-compose yaml
 	dockerComposePorts := []int{}
 	url := fmt.Sprintf("%s/raw/master/docker-compose.yml", gitRepo)
@@ -407,8 +615,8 @@ func deployExample(userId string, gitRepo string, pvTemplate string, pvcTemplate
 		}
 	}
 	// create persistent volume if not exits
-	var pvName = getPersistentVolumeName(userId)
-	var pvPath = getPersistentVolumePath(userId)
+	pvName := getPersistentVolumeName(userId)
+	pvPath := getPersistentVolumePath(userId)
 	pvResponse, err := getPersistentVolume(pvName, kubeServiceToken, kubeServiceBaseUrl)
 	if err != nil {
 		log.Println("Error saving persistent volume: ", err)
@@ -425,7 +633,7 @@ func deployExample(userId string, gitRepo string, pvTemplate string, pvcTemplate
 		}
 	}
 	// create persistent volume claim, if not exists
-	var pvcName = getPersistentVolumeClaimName(userId)
+	pvcName := getPersistentVolumeClaimName(userId)
 	pvcResponse, err := getPersistentVolumeClaim(pvcName, kubeServiceToken, kubeServiceBaseUrl)
 	if err != nil {
 		log.Println("Error saving persistent volume claim: ", err)
@@ -439,20 +647,9 @@ func deployExample(userId string, gitRepo string, pvTemplate string, pvcTemplate
 			return nil, err
 		}
 	}
-	// wait until deployment has been terminated
-	i := 1
-	for i < 6 {
-		deployed, _ := isExampleDeployed(userId, kubeServiceToken, kubeServiceBaseUrl)
-		if deployed {
-			time.Sleep(5 * time.Second)
-			i++
-		} else {
-			break
-		}
-	}
 	// create deployment
-	var deploymentName = getDeploymentName(userId)
-	var appLabel = getAppLabel(userId)
+	appLabel := getAppLabel(userId)
+	deploymentName := getDeploymentName(userId)
 	deployment := deploymentTemplate
 	deployment = strings.Replace(deployment, VAR_DEPLOYMENT_NAME, deploymentName, -1)
 	deployment = strings.Replace(deployment, VAR_APP_LABEL, appLabel, -1)
@@ -467,10 +664,7 @@ func deployExample(userId string, gitRepo string, pvTemplate string, pvcTemplate
 		return nil, err
 	}
 	// deployment created, now create the service
-	var serviceName = getServiceName(userId)
-	// delete service if exists (ignore errors)
-	_, _ = deleteService(serviceName, kubeServiceToken, kubeServiceBaseUrl)
-	// create service
+	serviceName := getServiceName(userId)
 	service := serviceTemplate
 	service = strings.Replace(service, VAR_SERVICE_NAME, serviceName, -1)
 	service = strings.Replace(service, VAR_APP_LABEL, appLabel, -1)

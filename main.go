@@ -91,10 +91,7 @@ func up(w http.ResponseWriter, r *http.Request) {
 	} else if exists {
 		log.Printf("Example deployed for user '%s'.\n", upRequest.UserId)
 		deployment, ok := deployments[upRequest.UserId]
-		if ! ok || ! strings.EqualFold(upRequest.Repo, deployment.UpRequest.Repo) {
-			log.Printf("Repo changed, deleting deployment for userId '%s'...\n", upRequest.UserId)
-			deleteExample(upRequest.UserId, kubeServiceToken, kubeServiceBaseUrl)
-		} else {
+		if ok &&  strings.EqualFold(upRequest.Repo, deployment.UpRequest.Repo) {
 			log.Println("Returning existing deployment details...")
 			upResponse = deployment.UpResponse
 		}
