@@ -43,3 +43,4 @@ spec:
         - name: docker-storage
           persistentVolumeClaim:
             claimName: $pvcName
+      terminationGracePeriodSeconds: 10

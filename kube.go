@@ -477,7 +477,8 @@ func deletePod(label string, kubeServiceToken string, kubeServiceBaseUrl string)
 func waitForPodTermination(label string, kubeServiceToken string, kubeServiceBaseUrl string) (bool, error) {
 	log.Printf("Waiting for pod termination for label '%s'...\n", label)
 	i := 0
-	for i < 9 {
+	for i < 6 {
+		i++
 		time.Sleep(5 *time.Second)
 		name, err := getPodName(label, kubeServiceToken, kubeServiceBaseUrl)
 		if err != nil {
@@ -588,6 +589,7 @@ func deployExample(userId string, gitRepo string, pvTemplate string, pvcTemplate
 	deleteExample(userId, kubeServiceToken, kubeServiceBaseUrl)
 	// download docker-compose yaml
 	dockerComposePorts := []int{}
+	dockerComposePaths := make(map[string]string)
 	url := fmt.Sprintf("%s/raw/master/docker-compose.yml", gitRepo)
 	log.Printf("Downloading docker-compose file from '%s'...\n", url)
 	client := getHttpClient()
@@ -610,6 +612,7 @@ func deployExample(userId string, gitRepo string, pvTemplate string, pvcTemplate
 			} else {
 				for k, v := range m {
 					getDockerComposePorts(v, &dockerComposePorts, k.(string))
+					getDockerComposePaths(v, &dockerComposePaths, k.(string))
 				}
 			}
 		}
@@ -700,12 +703,12 @@ func deployExample(userId string, gitRepo string, pvTemplate string, pvcTemplate
 		details.ProxyPort = proxyNodePort
 		details.DockerComposePorts = dockerComposePorts
 		for _, element := range details.DockerComposePorts {
-			details.DockerComposeUrls = append(details.DockerComposeUrls, fmt.Sprintf("http://%d.%s:%d",element,details.NodeHostName,details.ProxyPort))
+			path := dockerComposePaths[strconv.Itoa(element)]
+			details.DockerComposeUrls = append(details.DockerComposeUrls, fmt.Sprintf("http://%d.%s:%d%s",element,details.NodeHostName,details.ProxyPort,path))
 		}
 		return details, nil
 	}
 }
-
 
 func getDockerComposePorts(v interface{}, ports *[]int, parent string) {
 	typ := reflect.TypeOf(v).Kind()
@@ -733,6 +736,39 @@ func getDockerComposePortsMap(m map[interface{}]interface{}, ports *[]int) {
 func getDockerComposePortsSlice(slc []interface{}, ports *[]int, parent string) {
 	for _, v := range slc {
 		getDockerComposePorts(v, ports, parent)
+	}
+}
+
+func getDockerComposePaths(v interface{}, paths *map[string]string, parent string) {
+	typ := reflect.TypeOf(v).Kind()
+	if typ == reflect.String {
+		if parent == "labels" {
+			str := v.(string)
+			key := "com.exampleup.proxy.path."
+			if strings.Contains(str, key) {
+				str = strings.TrimPrefix(str, key)
+				strs := strings.SplitN(str, ":", 2)
+				portStr := strs[0]
+				pathStr := strs[1]
+				(*paths)[portStr] = pathStr
+			}
+		}
+	} else if typ == reflect.Slice {
+		getDockerComposePathsSlice(v.([]interface{}), paths, parent)
+	} else if typ == reflect.Map {
+		getDockerComposePathsMap(v.(map[interface{}]interface{}), paths)
+	}
+}
+
+func getDockerComposePathsMap(m map[interface{}]interface{}, paths *map[string]string) {
+	for k, v := range m {
+		getDockerComposePaths(v, paths, strings.ToLower(k.(string)))
+	}
+}
+
+func getDockerComposePathsSlice(slc []interface{}, paths *map[string]string, parent string) {
+	for _, v := range slc {
+		getDockerComposePaths(v, paths, parent)
 	}
 }
 
