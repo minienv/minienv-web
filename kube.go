@@ -12,10 +12,14 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v2"
 )
 
+var VAR_PV_NAME string = "$pvName"
+var VAR_PV_PATH string = "$pvPath"
+var VAR_PVC_NAME string = "$pvcName"
 var VAR_SERVICE_NAME string = "$serviceName"
 var VAR_DEPLOYMENT_NAME string = "$deploymentName"
 var VAR_APP_LABEL string = "$appLabel"
@@ -27,6 +31,22 @@ var VAR_GIT_REPO string = "$gitRepo"
 var DEFAULT_LOG_PORT string = "30081"
 var DEFAULT_EDITOR_PORT string = "30082"
 var DEFAULT_PROXY_PORT string = "30083"
+
+type GetPersistentVolumeResponse struct {
+	Kind string `json:"kind"`
+}
+
+type SavePersistentVolumeResponse struct {
+	Kind string `json:"kind"`
+}
+
+type GetPersistentVolumeClaimResponse struct {
+	Kind string `json:"kind"`
+}
+
+type SavePersistentVolumeClaimResponse struct {
+	Kind string `json:"kind"`
+}
 
 type GetDeploymentResponse struct {
 	Kind string `json:"kind"`
@@ -80,6 +100,110 @@ func getHttpClient() *http.Client {
 	}
 	client := &http.Client{Transport: tr}
 	return client
+}
+
+func getPersistentVolume(name string, kubeServiceToken string, kubeServiceBaseUrl string) (*GetPersistentVolumeResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/persistentvolumes/%s", kubeServiceBaseUrl, name)
+	client := getHttpClient()
+	req, err := http.NewRequest("GET", url, nil)
+	if len(kubeServiceToken) > 0 {
+		log.Printf("Authorization=Bearer %s\n", kubeServiceToken)
+		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("Error getting service: ", err)
+		return nil, err
+	} else {
+		var getPersistentVolumeResp GetPersistentVolumeResponse
+		err := json.NewDecoder(resp.Body).Decode(&getPersistentVolumeResp)
+		if err != nil {
+			return nil, err
+		} else if getPersistentVolumeResp.Kind != "PersistentVolume" {
+			return nil, nil
+		} else {
+			return &getPersistentVolumeResp, nil
+		}
+	}
+}
+
+func savePersistentVolume(yaml string, kubeServiceToken string, kubeServiceBaseUrl string) (*SavePersistentVolumeResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/persistentvolumes", kubeServiceBaseUrl)
+	//log.Printf("POST %s\n%s\n", url, yaml)
+	client := getHttpClient()
+	req, err := http.NewRequest("POST", url, strings.NewReader(yaml))
+	req.Header.Add("Content-Type", "application/yaml")
+	if len(kubeServiceToken) > 0 {
+		log.Printf("Authorization=Bearer %s\n", kubeServiceToken)
+		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Print("Error saving service: ", err)
+		return nil, err
+	} else {
+		var savePersistentVolumeResp SavePersistentVolumeResponse
+		err := json.NewDecoder(resp.Body).Decode(&savePersistentVolumeResp)
+		if err != nil {
+			return nil, err
+		} else if savePersistentVolumeResp.Kind != "PersistentVolume" {
+			return nil, errors.New("Unable to create persistent volume")
+		} else {
+			return &savePersistentVolumeResp, nil
+		}
+	}
+}
+
+func getPersistentVolumeClaim(name string, kubeServiceToken string, kubeServiceBaseUrl string) (*GetPersistentVolumeClaimResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/namespaces/default/persistentvolumeclaims/%s", kubeServiceBaseUrl, name)
+	client := getHttpClient()
+	req, err := http.NewRequest("GET", url, nil)
+	if len(kubeServiceToken) > 0 {
+		log.Printf("Authorization=Bearer %s\n", kubeServiceToken)
+		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("Error getting service: ", err)
+		return nil, err
+	} else {
+		var getPersistentVolumeClaimResp GetPersistentVolumeClaimResponse
+		err := json.NewDecoder(resp.Body).Decode(&getPersistentVolumeClaimResp)
+		if err != nil {
+			return nil, err
+		} else if getPersistentVolumeClaimResp.Kind != "PersistentVolumeClaim" {
+			return nil, nil
+		} else {
+			return &getPersistentVolumeClaimResp, nil
+		}
+	}
+}
+
+func savePersistentVolumeClaim(yaml string, kubeServiceToken string, kubeServiceBaseUrl string) (*SavePersistentVolumeClaimResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/namespaces/default/persistentvolumeclaims", kubeServiceBaseUrl)
+	//log.Printf("POST %s\n%s\n", url, yaml)
+	client := getHttpClient()
+	req, err := http.NewRequest("POST", url, strings.NewReader(yaml))
+	req.Header.Add("Content-Type", "application/yaml")
+	if len(kubeServiceToken) > 0 {
+		log.Printf("Authorization=Bearer %s\n", kubeServiceToken)
+		req.Header.Add("Authorization", "Bearer " + kubeServiceToken)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Print("Error saving service: ", err)
+		return nil, err
+	} else {
+		var savePersistentVolumeClaimResp SavePersistentVolumeClaimResponse
+		err := json.NewDecoder(resp.Body).Decode(&savePersistentVolumeClaimResp)
+		if err != nil {
+			return nil, err
+		} else if savePersistentVolumeClaimResp.Kind != "PersistentVolumeClaim" {
+			return nil, errors.New("Unable to create persistent volume claim")
+		} else {
+			return &savePersistentVolumeClaimResp, nil
+		}
+	}
 }
 
 func getDeployment(name string, kubeServiceToken string, kubeServiceBaseUrl string) (*GetDeploymentResponse, error) {
@@ -202,7 +326,7 @@ func saveService(yaml string, kubeServiceToken string, kubeServiceBaseUrl string
 		if err != nil {
 			return nil, err
 		} else if saveServiceResp.Kind != "Service" {
-			return nil, errors.New("Unable to create deployment")
+			return nil, errors.New("Unable to create service")
 		} else {
 			return &saveServiceResp, nil
 		}
@@ -253,7 +377,7 @@ func deleteExample(userId string, kubeServiceToken string, kubeServiceBaseUrl st
 	}
 }
 
-func deployExample(userId string, gitRepo string, deploymentTemplate string, serviceTemplate string, kubeServiceToken string, kubeServiceBaseUrl string) (*DeploymentDetails, error) {
+func deployExample(userId string, gitRepo string, pvTemplate string, pvcTemplate string, deploymentTemplate string, serviceTemplate string, kubeServiceToken string, kubeServiceBaseUrl string) (*DeploymentDetails, error) {
 	// download docker-compose yaml
 	dockerComposePorts := []int{}
 	url := fmt.Sprintf("%s/raw/master/docker-compose.yml", gitRepo)
@@ -282,7 +406,51 @@ func deployExample(userId string, gitRepo string, deploymentTemplate string, ser
 			}
 		}
 	}
-	//
+	// create persistent volume if not exits
+	var pvName = getPersistentVolumeName(userId)
+	var pvPath = getPersistentVolumePath(userId)
+	pvResponse, err := getPersistentVolume(pvName, kubeServiceToken, kubeServiceBaseUrl)
+	if err != nil {
+		log.Println("Error saving persistent volume: ", err)
+		return nil, err
+	} else if pvResponse == nil {
+		pv := pvTemplate
+		pv = strings.Replace(pv, VAR_PV_NAME, pvName, -1)
+		pv = strings.Replace(pv, VAR_PV_PATH, pvPath, -1)
+		log.Println(pv)
+		_, err = savePersistentVolume(pv, kubeServiceToken, kubeServiceBaseUrl)
+		if err != nil {
+			log.Println("Error saving persistent volume: ", err)
+			return nil, err
+		}
+	}
+	// create persistent volume claim, if not exists
+	var pvcName = getPersistentVolumeClaimName(userId)
+	pvcResponse, err := getPersistentVolumeClaim(pvcName, kubeServiceToken, kubeServiceBaseUrl)
+	if err != nil {
+		log.Println("Error saving persistent volume claim: ", err)
+		return nil, err
+	} else if pvcResponse == nil {
+		pvc := pvcTemplate
+		pvc = strings.Replace(pvc, VAR_PVC_NAME, pvcName, -1)
+		_, err = savePersistentVolumeClaim(pvc, kubeServiceToken, kubeServiceBaseUrl)
+		if err != nil {
+			log.Println("Error saving persistent volume claim: ", err)
+			return nil, err
+		}
+	}
+	// wait until deployment has been terminated
+	i := 1
+	for i < 6 {
+		deployed, _ := isExampleDeployed(userId, kubeServiceToken, kubeServiceBaseUrl)
+		if deployed {
+			time.Sleep(5 * time.Second)
+			i++
+		} else {
+			break
+		}
+	}
+	// create deployment
 	var deploymentName = getDeploymentName(userId)
 	var appLabel = getAppLabel(userId)
 	deployment := deploymentTemplate
@@ -292,52 +460,55 @@ func deployExample(userId string, gitRepo string, deploymentTemplate string, ser
 	deployment = strings.Replace(deployment, VAR_EDITOR_PORT, DEFAULT_EDITOR_PORT, -1)
 	deployment = strings.Replace(deployment, VAR_PROXY_PORT, DEFAULT_PROXY_PORT, -1)
 	deployment = strings.Replace(deployment, VAR_GIT_REPO, gitRepo, -1)
+	deployment = strings.Replace(deployment, VAR_PVC_NAME, pvcName, -1)
 	_, err = saveDeployment(deployment, kubeServiceToken, kubeServiceBaseUrl)
 	if err != nil {
 		log.Println("Error saving deployment: ", err)
 		return nil, err
+	}
+	// deployment created, now create the service
+	var serviceName = getServiceName(userId)
+	// delete service if exists (ignore errors)
+	_, _ = deleteService(serviceName, kubeServiceToken, kubeServiceBaseUrl)
+	// create service
+	service := serviceTemplate
+	service = strings.Replace(service, VAR_SERVICE_NAME, serviceName, -1)
+	service = strings.Replace(service, VAR_APP_LABEL, appLabel, -1)
+	service = strings.Replace(service, VAR_LOG_PORT, DEFAULT_LOG_PORT, -1)
+	service = strings.Replace(service, VAR_EDITOR_PORT, DEFAULT_EDITOR_PORT, -1)
+	service = strings.Replace(service, VAR_PROXY_PORT, DEFAULT_PROXY_PORT, -1)
+	serviceResp, err := saveService(service, kubeServiceToken, kubeServiceBaseUrl)
+	if err != nil {
+		log.Println("Error saving service: ", err)
+		return nil, err
 	} else {
-		// deployment created, now create the service
-		var serviceName = getServiceName(userId)
-		service := serviceTemplate
-		service = strings.Replace(service, VAR_SERVICE_NAME, serviceName, -1)
-		service = strings.Replace(service, VAR_APP_LABEL, appLabel, -1)
-		service = strings.Replace(service, VAR_LOG_PORT, DEFAULT_LOG_PORT, -1)
-		service = strings.Replace(service, VAR_EDITOR_PORT, DEFAULT_EDITOR_PORT, -1)
-		service = strings.Replace(service, VAR_PROXY_PORT, DEFAULT_PROXY_PORT, -1)
-		serviceResp, err := saveService(service, kubeServiceToken, kubeServiceBaseUrl)
-		if err != nil {
-			log.Println("Error saving service: ", err)
-			return nil, err
-		} else {
-			logNodePort := 0
-			editorNodePort := 0
-			proxyNodePort := 0
-			for _, element := range serviceResp.Spec.Ports {
-				if element.Name == "log" {
-					logNodePort = element.NodePort
-				}
-				if element.Name == "editor" {
-					editorNodePort = element.NodePort
-				}
-				if element.Name == "proxy" {
-					proxyNodePort = element.NodePort
-				}
-				// element is the element from someSlice for where we are
+		logNodePort := 0
+		editorNodePort := 0
+		proxyNodePort := 0
+		for _, element := range serviceResp.Spec.Ports {
+			if element.Name == "log" {
+				logNodePort = element.NodePort
 			}
-			details := &DeploymentDetails{}
-			details.NodeHostName = os.Getenv("EXUP_NODE_HOST_NAME") // mw:TODO
-			details.LogPort = logNodePort
-			details.LogUrl = fmt.Sprintf("http://%s:%d", details.NodeHostName, details.LogPort)
-			details.EditorPort = editorNodePort
-			details.EditorUrl = fmt.Sprintf("http://%s:%d", details.NodeHostName, details.EditorPort)
-			details.ProxyPort = proxyNodePort
-			details.DockerComposePorts = dockerComposePorts
-			for _, element := range details.DockerComposePorts {
-				details.DockerComposeUrls = append(details.DockerComposeUrls, fmt.Sprintf("http://%d.%s:%d",element,details.NodeHostName,details.ProxyPort))
+			if element.Name == "editor" {
+				editorNodePort = element.NodePort
 			}
-			return details, nil
+			if element.Name == "proxy" {
+				proxyNodePort = element.NodePort
+			}
+			// element is the element from someSlice for where we are
 		}
+		details := &DeploymentDetails{}
+		details.NodeHostName = os.Getenv("EXUP_NODE_HOST_NAME") // mw:TODO
+		details.LogPort = logNodePort
+		details.LogUrl = fmt.Sprintf("http://%s:%d", details.NodeHostName, details.LogPort)
+		details.EditorPort = editorNodePort
+		details.EditorUrl = fmt.Sprintf("http://%s:%d", details.NodeHostName, details.EditorPort)
+		details.ProxyPort = proxyNodePort
+		details.DockerComposePorts = dockerComposePorts
+		for _, element := range details.DockerComposePorts {
+			details.DockerComposeUrls = append(details.DockerComposeUrls, fmt.Sprintf("http://%d.%s:%d",element,details.NodeHostName,details.ProxyPort))
+		}
+		return details, nil
 	}
 }
 
@@ -369,6 +540,18 @@ func getDockerComposePortsSlice(slc []interface{}, ports *[]int, parent string) 
 	for _, v := range slc {
 		getDockerComposePorts(v, ports, parent)
 	}
+}
+
+func getPersistentVolumeName(userId string) string {
+	return strings.ToLower(fmt.Sprintf("u-%s-pv", userId))
+}
+
+func getPersistentVolumePath(userId string) string {
+	return strings.ToLower(fmt.Sprintf("/u-%s-docker", userId))
+}
+
+func getPersistentVolumeClaimName(userId string) string {
+	return strings.ToLower(fmt.Sprintf("u-%s-pvc", userId))
 }
 
 func getServiceName(userId string) string {

@@ -8,6 +8,9 @@ var app = {
     pendingIFrameTimer: null,
     pendingIFrameTimeMillis: 5000,
     pendingIFrameTimeoutMillis: 10000,
+    addedNavItems: [],
+    addedTabs: [],
+
 
     processPendingIFrames: function() {
         var keys = Object.keys(app.pendingIFrames);
@@ -28,24 +31,6 @@ var app = {
         }
 
     },
-
-    // loadIFrame: function(iframe, src) {
-    //     app.pendingIFrames[src] = {iframe: iframe, date: Date.now()};
-    //     iframe.onload = function() {
-    //         delete app.pendingIFrames[src];
-    //     };
-    //     setTimeout(function() {
-    //         if (! app.pendingIFrameTimer) {
-    //             app.pendingIFrameTimer = setTimeout(app.processPendingIFrames, app.pendingIFrameTimeMillis);
-    //         }
-    //         try {
-    //             iframe.src = src;
-    //         }
-    //         catch(err) {
-    //             console.log('Error loading ' + src + ': ' + err);
-    //         }
-    //     }, 0);
-    // },
 
     loadIFrame: function(iframe, src) {
         console.log(Date.now() + ': Loading ' + src);
@@ -91,8 +76,82 @@ var app = {
         }, timeout);
     },
 
+    getListItem: function(id, title) {
+        var anchorText = document.createTextNode(title);
+        var anchor = document.createElement('a');
+        anchor.setAttribute('class', 'nav-link');
+        anchor.setAttribute('data-toggle', 'tab');
+        anchor.setAttribute('href', '#'+id);
+        anchor.setAttribute('role', 'tab');
+        anchor.appendChild(anchorText);
+        var listItem = document.createElement('li');
+        listItem.setAttribute('class', 'nav-item');
+        listItem.appendChild(anchor);
+        return listItem;
+    },
+
+    getTab: function(tabId, iframeId) {
+        var iframe = document.createElement('iframe');
+        iframe.id = iframeId;
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.padding = '10px';
+        iframe.style.border = '0px';
+        var div = document.createElement('div');
+        div.id = tabId;
+        div.setAttribute('class', 'tab-pane');
+        div.setAttribute('role', 'tabpanel');
+        div.appendChild(iframe);
+        return div;
+    },
+
+    processUpResponse: function(upResponse) {
+        // add nav item for editor
+        var navItems = document.getElementById('nav-items');
+        var navItem = app.getListItem("editor",'Editor');
+        navItems.appendChild(navItem);
+        app.addedNavItems.push(navItem);
+        // add tab for editor
+        var tabs = document.getElementById('tabs');
+        var tab = app.getTab('editor','editor-iframe');
+        tabs.appendChild(tab);
+        app.addedTabs.push(tab);
+        for (var i = 0; i < upResponse.dockerComposeUrls.length; i++) {
+            var tabId = 'proxy' + i;
+            var iframeId = 'proxy' + i + '-iframe';
+            // add nav item
+            navItem = app.getListItem(tabId,upResponse.dockerComposePorts[i]+'');
+            navItems.appendChild(navItem);
+            app.addedNavItems.push(navItem);
+            // add tab
+            tab = app.getTab(tabId, iframeId);
+            tabs.appendChild(tab);
+            app.addedTabs.push(tab);
+            // queue iframe
+            app.queueIFrame(document.getElementById(iframeId), upResponse.dockerComposeUrls[i], app.pendingIFrameSleepTimeMillis);
+        }
+        app.queueIFrame(document.getElementById('editor-iframe'), upResponse.editorUrl, app.pendingIFrameSleepTimeMillis);
+        app.queueIFrame(document.getElementById('log-iframe'), upResponse.logUrl, app.pendingIFrameSleepTimeMillis);
+    },
 
     up: function () {
+        // reset ui
+        document.getElementById('log-iframe').src = 'about:blank';
+        if (app.addedTabs.length > 0) {
+            var tabs = document.getElementById('tabs');
+            for (var i=0; i<app.addedTabs.length; i++) {
+                tabs.removeChild(app.addedTabs[i]);
+            }
+            app.addedTabs = [];
+        }
+        if (app.addedNavItems.length > 0) {
+            var navItems = document.getElementById('nav-items');
+            for (var i=0; i<app.addedNavItems.length; i++) {
+                navItems.removeChild(app.addedNavItems[i]);
+            }
+            app.addedNavItems = [];
+        }
+        // make request to server
         var request = new XMLHttpRequest();
         var json = JSON.stringify({
             userId: app.userId,
@@ -101,29 +160,7 @@ var app = {
         request.onload = function () {
             if (this.status >= 200 && this.status < 400) {
                 var upResponse = JSON.parse(this.responseText);
-                var dcIframeContainer = document.getElementById('dc-iframe-container');
-                while (dcIframeContainer.firstChild) {
-                    dcIframeContainer.removeChild(dcIframeContainer.firstChild);
-                }
-                var dcIFrames = []
-                var dcIframeIds = [];
-                var dcIFrameSizes = [];
-                for (var i = 0; i < upResponse.dockerComposeUrls.length; i++) {
-                    var iframe = document.createElement('iframe');
-                    iframe.id = 'dc-iframe-' + i;
-                    iframe.style.width = '100%';
-                    iframe.style.border = '0px';
-                    app.queueIFrame(iframe, upResponse.dockerComposeUrls[i], app.pendingIFrameSleepTimeMillis);
-                    dcIframeContainer.appendChild(iframe);
-                    dcIFrames.push(iframe);
-                    dcIframeIds.push('#' + iframe.id);
-                    dcIFrameSizes.push(100/upResponse.dockerComposeUrls.length);
-                }
-                Split(dcIframeIds, {
-                    direction: 'vertical',
-                    sizes: dcIFrameSizes
-                });
-                app.queueIFrame(document.getElementById('editor-iframe'), upResponse.editorUrl, app.pendingIFrameSleepTimeMillis);
+                app.processUpResponse(upResponse);
             }
             else {
                 console.log('Error deploying repo.');

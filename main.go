@@ -11,6 +11,8 @@ import (
 )
 
 var deployments map[string]*Deployment = make(map[string]*Deployment)
+var examplePvTemplate string
+var examplePvcTemplate string
 var exampleDeploymentTemplate string
 var exampleServiceTemplate string
 var kubeServiceProtocol string
@@ -39,7 +41,9 @@ type UpRequest struct {
 }
 
 type UpResponse struct {
+	LogUrl string `json:"logUrl"`
 	EditorUrl string `json:"editorUrl"`
+	DockerComposePorts []int `json:"dockerComposePorts"`
 	DockerComposeUrls []string `json:"dockerComposeUrls"`
 }
 
@@ -97,14 +101,16 @@ func up(w http.ResponseWriter, r *http.Request) {
 	}
 	if upResponse == nil  {
 		log.Println("Creating new deployment...")
-		details, err := deployExample(upRequest.UserId, upRequest.Repo, exampleDeploymentTemplate, exampleServiceTemplate, kubeServiceToken, kubeServiceBaseUrl)
+		details, err := deployExample(upRequest.UserId, upRequest.Repo, examplePvTemplate, examplePvcTemplate, exampleDeploymentTemplate, exampleServiceTemplate, kubeServiceToken, kubeServiceBaseUrl)
 		if err != nil {
 			log.Print("Error creating deployment: ", err)
 			http.Error(w, err.Error(), 400)
 			return
 		} else {
 			upResponse = &UpResponse{}
+			upResponse.LogUrl = details.LogUrl
 			upResponse.EditorUrl = details.EditorUrl
+			upResponse.DockerComposePorts = details.DockerComposePorts
 			upResponse.DockerComposeUrls = details.DockerComposeUrls
 			deployments[upRequest.UserId] = &Deployment{upRequest.UserId, &upRequest, upResponse}
 		}
@@ -133,6 +139,8 @@ func main() {
 	if _, err := strconv.Atoi(os.Args[1]); err != nil {
 		log.Fatalf("Invalid port: %s (%s)\n", os.Args[1], err)
 	}
+	examplePvTemplate = loadFile("./example-pv.yml")
+	examplePvcTemplate = loadFile("./example-pvc.yml")
 	exampleDeploymentTemplate = loadFile("./example-deployment.yml")
 	exampleServiceTemplate = loadFile("./example-service.yml")
 	kubeServiceProtocol := os.Getenv("KUBERNETES_SERVICE_PROTOCOL")

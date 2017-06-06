@@ -10,29 +10,39 @@ html, body {
 }
 
 #main-container {
+	width: 100%;
 	height: 100%;
-	padding: 30px;
-	float: left;
+	display: flex;
+	flex-flow: column;
 }
 
-#proxy-container {
-	height: 100%;
-	padding: 0px;
-	margin: 0px;
-	float: left;
+#main-repo-container {
+	display: flex;
+	flex: 0 0 auto;
 }
 
-#dc-iframe-container {
+#main-log-container {
+	display: flex;
+	flex: 1 0 auto;
+}
+
+#tab-container {
+	width: 100%;
 	height: 100%;
-	padding: 0px;
+	padding: 10px;
 	margin: 0px;
 }
 
-#editor-container {
+.tab-content {
+	width: 100%;
 	height: 100%;
-	padding: 0px;
+	padding: 10px;
 	margin: 0px;
-	float: left;
+}
+
+.tab-pane {
+	width: 100%;
+	height: 100%;
 }
 
 .gutter {
