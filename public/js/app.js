@@ -11,7 +11,6 @@ var app = {
     addedNavItems: [],
     addedTabs: [],
 
-
     processPendingIFrames: function() {
         var keys = Object.keys(app.pendingIFrames);
         var pending = keys.length;
@@ -120,7 +119,7 @@ var app = {
             var tabId = 'proxy' + i;
             var iframeId = 'proxy' + i + '-iframe';
             // add nav item
-            navItem = app.getListItem(tabId,upResponse.dockerComposePorts[i]+'');
+            navItem = app.getListItem(tabId,upResponse.dockerComposeNames[i]+'');
             navItems.appendChild(navItem);
             app.addedNavItems.push(navItem);
             // add tab
@@ -137,6 +136,7 @@ var app = {
     up: function () {
         // reset ui
         document.getElementById('log-iframe').src = 'about:blank';
+        document.getElementById('repo-btn').disabled = true;
         if (app.addedTabs.length > 0) {
             var tabs = document.getElementById('tabs');
             for (var i=0; i<app.addedTabs.length; i++) {
@@ -158,11 +158,14 @@ var app = {
             repo: app.repo
         });
         request.onload = function () {
+            document.getElementById('repo-btn').disabled = false;
             if (this.status >= 200 && this.status < 400) {
+                document.getElementById('log-iframe').contentWindow.document.write("<html><body style='font-family: -apple-system,system-ui,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,sans-serif' font-size: 11pt;'><pre>Please wait...this may take a minute or two...</pre></body></html>");
                 var upResponse = JSON.parse(this.responseText);
                 app.processUpResponse(upResponse);
             }
             else {
+                document.getElementById('log-iframe').contentWindow.document.write("<html><body style='font-family: -apple-system,system-ui,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,sans-serif' font-size: 11pt;'><pre>Error deploying repo. Please try again...</pre></body></html>");
                 console.log('Error deploying repo.');
             }
         };
@@ -208,15 +211,15 @@ var app = {
             }
         }
         // wire up events
-        document.getElementById('repo-input-text').addEventListener('keypress', function(e) {
+        document.getElementById('repo-input').addEventListener('keypress', function(e) {
             if (e.keyCode === 13) {
                 e.preventDefault();
-                app.repo = document.getElementById('repo-input-text').value;
+                app.repo = document.getElementById('repo-input').value;
                 app.up();
             }
         });
         document.getElementById('repo-btn').addEventListener('click', function() {
-            app.repo = document.getElementById('repo-input-text').value;
+            app.repo = document.getElementById('repo-input').value;
             app.up();
         });
         // periodically ping the server to signal that we are still alive

@@ -43,7 +43,7 @@ type UpRequest struct {
 type UpResponse struct {
 	LogUrl string `json:"logUrl"`
 	EditorUrl string `json:"editorUrl"`
-	DockerComposePorts []int `json:"dockerComposePorts"`
+	DockerComposeNames []string `json:"dockerComposeNames"`
 	DockerComposeUrls []string `json:"dockerComposeUrls"`
 }
 
@@ -107,7 +107,7 @@ func up(w http.ResponseWriter, r *http.Request) {
 			upResponse = &UpResponse{}
 			upResponse.LogUrl = details.LogUrl
 			upResponse.EditorUrl = details.EditorUrl
-			upResponse.DockerComposePorts = details.DockerComposePorts
+			upResponse.DockerComposeNames = details.DockerComposeNames
 			upResponse.DockerComposeUrls = details.DockerComposeUrls
 			deployments[upRequest.UserId] = &Deployment{upRequest.UserId, &upRequest, upResponse}
 		}
