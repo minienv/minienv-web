@@ -632,6 +632,7 @@ func deployExample(userId string, gitRepo string, pvTemplate string, pvcTemplate
 		pv := pvTemplate
 		pv = strings.Replace(pv, VAR_PV_NAME, pvName, -1)
 		pv = strings.Replace(pv, VAR_PV_PATH, pvPath, -1)
+
 		_, err = savePersistentVolume(pv, kubeServiceToken, kubeServiceBaseUrl)
 		if err != nil {
 			log.Println("Error saving persistent volume: ", err)

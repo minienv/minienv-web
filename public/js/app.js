@@ -96,15 +96,21 @@ var app = {
         iframe.style.height = '100%';
         iframe.style.padding = '10px';
         iframe.style.border = '0px';
+        return app.getTabWithChild(tabId, iframe);
+    },
+
+    getTabWithChild: function(tabId, child) {
         var div = document.createElement('div');
         div.id = tabId;
         div.setAttribute('class', 'tab-pane');
         div.setAttribute('role', 'tabpanel');
-        div.appendChild(iframe);
+        div.appendChild(child);
         return div;
     },
 
     processUpResponse: function(upResponse) {
+        document.getElementById('repo-btn').disabled = false;
+        document.getElementById('log-iframe').contentWindow.document.write("<html><body style='font-family: -apple-system,system-ui,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,sans-serif' font-size: 11pt;'><pre>Please wait...this may take a minute or two...</pre></body></html>");
         // add nav item for editor
         var navItems = document.getElementById('nav-items');
         var navItem = app.getListItem("editor",'Editor');
@@ -129,11 +135,32 @@ var app = {
             // queue iframe
             app.queueIFrame(document.getElementById(iframeId), upResponse.dockerComposeUrls[i], app.pendingIFrameSleepTimeMillis);
         }
+        // deploy to bluemix
+        if (upResponse.deployToBluemix) {
+            var tabId = 'deploy';
+            // add nav item
+            navItem = app.getListItem(tabId,'Deploy');
+            navItems.appendChild(navItem);
+            app.addedNavItems.push(navItem);
+            // add tab
+            var img = document.createElement('img');
+            img.setAttribute('src', 'https://bluemix.net/deploy/button.png');
+            img.setAttribute('alt', 'Deploy to Bluemix');
+            var anchor = document.createElement('a');
+            anchor.setAttribute('href', 'https://bluemix.net/deploy?repository=' + encodeURIComponent(app.repo));
+            anchor.setAttribute('target', '_blank');
+            anchor.appendChild(img);
+            var tabs = document.getElementById('tabs');
+            var tab = app.getTabWithChild(tabId, anchor);
+            tabs.appendChild(tab);
+            app.addedTabs.push(tab);
+        }
+        //
         app.queueIFrame(document.getElementById('editor-iframe'), upResponse.editorUrl, app.pendingIFrameSleepTimeMillis);
         app.queueIFrame(document.getElementById('log-iframe'), upResponse.logUrl, app.pendingIFrameSleepTimeMillis);
     },
 
-    up: function () {
+    preUp: function() {
         // reset ui
         document.getElementById('log-iframe').src = 'about:blank';
         document.getElementById('repo-btn').disabled = true;
@@ -151,16 +178,19 @@ var app = {
             }
             app.addedNavItems = [];
         }
+    },
+
+    up: function() {
+        app.preUp();
         // make request to server
         var request = new XMLHttpRequest();
         var json = JSON.stringify({
             userId: app.userId,
             repo: app.repo
         });
-        request.onload = function () {
+        request.onload = function() {
             document.getElementById('repo-btn').disabled = false;
             if (this.status >= 200 && this.status < 400) {
-                document.getElementById('log-iframe').contentWindow.document.write("<html><body style='font-family: -apple-system,system-ui,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,sans-serif' font-size: 11pt;'><pre>Please wait...this may take a minute or two...</pre></body></html>");
                 var upResponse = JSON.parse(this.responseText);
                 app.processUpResponse(upResponse);
             }
@@ -174,12 +204,18 @@ var app = {
         request.send(json);
     },
 
-    ping: function () {
+    ping: function() {
         var request = new XMLHttpRequest();
-        var json = JSON.stringify({userId: app.userId});
-        request.onload = function () {
+        var json = JSON.stringify({userId: app.userId, getUpDetails: ! app.repo});
+        request.onload = function() {
             if (this.status >= 200 && this.status < 400) {
-                // ok
+                var pingResponse = JSON.parse(this.responseText);
+                if (pingResponse.upDetails) {
+                    app.repo = pingResponse.upDetails.repo;
+                    document.getElementById('repo-input').value = app.repo;
+                    app.preUp();
+                    app.processUpResponse(pingResponse.upDetails);
+                }
             }
             else {
                 console.log('Error pinging server.');
@@ -190,7 +226,7 @@ var app = {
         request.send(json);
     },
 
-    generateUniqueId: function (len) {
+    generateUniqueId: function(len) {
         var ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
         var id = '';
         for (var i = 0; i < len; i++) {
@@ -199,9 +235,29 @@ var app = {
         return id;
     },
 
-    init: function () {
+    getParameterByName: function(name, url) {
+        if (!url) {
+            url = window.location.href;
+        }
+        name = name.replace(/[\[\]]/g, "\\$&");
+        var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)");
+        var results = regex.exec(url);
+        if (!results) {
+            return null;
+        }
+        if (!results[2]) {
+            return '';
+        }
+        return decodeURIComponent(results[2].replace(/\+/g, " "));
+    },
+
+    init: function() {
         // get userId
-        if (typeof(Storage) !== 'undefined') {
+        var userId = app.getParameterByName('id');
+        if (userId && userId.length > 0) {
+            app.userId = userId;
+        }
+        if (!app.userId && typeof(Storage) !== 'undefined') {
             app.userId = localStorage.getItem('userId');
         }
         if (!app.userId) {
@@ -224,10 +280,10 @@ var app = {
         });
         // periodically ping the server to signal that we are still alive
         // server will tear down any pods for users not actively running
-        setTimeout(app.onTimer, app.pingTimeMillis);
+        app.onTimer();
     },
 
-    onTimer: function () {
+    onTimer: function() {
         app.ping();
         setTimeout(app.onTimer, app.pingTimeMillis);
     }

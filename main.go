@@ -1,12 +1,13 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
-	"encoding/json"
-	"io/ioutil"
 	"strings"
 )
 
@@ -15,9 +16,6 @@ var examplePvTemplate string
 var examplePvcTemplate string
 var exampleDeploymentTemplate string
 var exampleServiceTemplate string
-var kubeServiceProtocol string
-var kubeServiceHost string
-var kubeServicePort string
 var kubeServiceToken string
 var kubeServiceBaseUrl string
 
@@ -29,10 +27,12 @@ type Deployment struct {
 
 type PingRequest struct {
 	UserId string `json:"userId"`
+	GetUpDetails bool `json:"getUpDetails"`
 }
 
 type PingResponse struct {
-	Status int `json:"status"`
+	Up bool `json:"up"`
+	UpDetails *UpResponse `json:"upDetails"`
 }
 
 type UpRequest struct {
@@ -41,10 +41,12 @@ type UpRequest struct {
 }
 
 type UpResponse struct {
+	Repo string `json:"repo"`
 	LogUrl string `json:"logUrl"`
 	EditorUrl string `json:"editorUrl"`
 	DockerComposeNames []string `json:"dockerComposeNames"`
 	DockerComposeUrls []string `json:"dockerComposeUrls"`
+	DeployToBluemix bool `json:"deployToBluemix"`
 }
 
 func ping(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +61,26 @@ func ping(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	var pingResponse = PingResponse{0}
+	// create response
+	var pingResponse = PingResponse{}
+	deployment, ok := deployments[pingRequest.UserId]
+	if ok {
+		pingResponse.Up = true
+		if pingRequest.GetUpDetails {
+			// make sure to check if it is really running
+			exists, err := isExampleDeployed(pingRequest.UserId, kubeServiceToken, kubeServiceBaseUrl)
+			if err != nil {
+				http.Error(w, err.Error(), 400)
+				return
+			}
+			pingResponse.Up = exists
+			if exists {
+				pingResponse.UpDetails = deployment.UpResponse
+			} else {
+				deployments[pingRequest.UserId] = nil
+			}
+		}
+	}
 	err = json.NewEncoder(w).Encode(&pingResponse)
 	if err != nil {
 		log.Print("Error encoding response: ", err)
@@ -105,6 +126,8 @@ func up(w http.ResponseWriter, r *http.Request) {
 			return
 		} else {
 			upResponse = &UpResponse{}
+			upResponse.Repo = upRequest.Repo
+			upResponse.DeployToBluemix = isManifestInRepo(upRequest.Repo)
 			upResponse.LogUrl = details.LogUrl
 			upResponse.EditorUrl = details.EditorUrl
 			upResponse.DockerComposeNames = details.DockerComposeNames
@@ -118,6 +141,22 @@ func up(w http.ResponseWriter, r *http.Request) {
 		log.Print("Error encoding response: ", err)
 		http.Error(w, err.Error(), 400)
 		return
+	}
+}
+
+func isManifestInRepo(gitRepo string) (bool) {
+	return isFileInRepo(gitRepo, "manifest.yml") || isFileInRepo(gitRepo, "manifest.yaml")
+}
+
+func isFileInRepo(gitRepo string, file string) (bool) {
+	url := fmt.Sprintf("%s/raw/master/%s", gitRepo, file)
+	client := getHttpClient()
+	req, err := http.NewRequest("GET", url, nil)
+	res, err := client.Do(req)
+	if err != nil || res.StatusCode == 404 {
+		return false
+	} else {
+		return true
 	}
 }
 

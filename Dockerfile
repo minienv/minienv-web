@@ -3,14 +3,14 @@ FROM golang:latest
 RUN mkdir -p /go/src/app
 WORKDIR /go/src/app
 ADD . /go/src/app/ 
-RUN go get -v -d
-RUN CGO_ENABLED=0 GOOS=linux go install -a -installsuffix cgo app
+RUN go get -v -d \
+  && CGO_ENABLED=0 GOOS=linux go install -a -installsuffix cgo app
 
 FROM alpine:latest
 COPY --from=0 /go/bin/app /app
-ADD example-pv.yml /
-ADD example-pvc.yml /
-ADD example-deployment.yml /
-ADD example-service.yml /
-ADD public /public
+COPY example-pv.yml \
+     example-pvc.yml \
+     example-deployment.yml \
+     example-service.yml /
+COPY public /public
 CMD ["/app", "80"]
