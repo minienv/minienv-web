@@ -44,8 +44,7 @@ type UpResponse struct {
 	Repo string `json:"repo"`
 	LogUrl string `json:"logUrl"`
 	EditorUrl string `json:"editorUrl"`
-	DockerComposeNames []string `json:"dockerComposeNames"`
-	DockerComposeUrls []string `json:"dockerComposeUrls"`
+	Tabs *[]*Tab `json:"tabs"`
 	DeployToBluemix bool `json:"deployToBluemix"`
 }
 
@@ -130,8 +129,7 @@ func up(w http.ResponseWriter, r *http.Request) {
 			upResponse.DeployToBluemix = isManifestInRepo(upRequest.Repo)
 			upResponse.LogUrl = details.LogUrl
 			upResponse.EditorUrl = details.EditorUrl
-			upResponse.DockerComposeNames = details.DockerComposeNames
-			upResponse.DockerComposeUrls = details.DockerComposeUrls
+			upResponse.Tabs = details.Tabs
 			deployments[upRequest.UserId] = &Deployment{upRequest.UserId, &upRequest, upResponse}
 		}
 	}

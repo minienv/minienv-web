@@ -4,7 +4,7 @@ var app = {
     repo: undefined,
     pingTimeMillis: 30000,
     pendingIFrameSleepTimeMillis: 100,
-    pendingIFrames : {},
+    pendingIFrames : [],
     pendingIFrameTimer: null,
     pendingIFrameTimeMillis: 5000,
     pendingIFrameTimeoutMillis: 10000,
@@ -12,14 +12,13 @@ var app = {
     addedTabs: [],
 
     processPendingIFrames: function() {
-        var keys = Object.keys(app.pendingIFrames);
-        var pending = keys.length;
-        for (var i=0; i<keys.length; i++) {
-            iframeMeta = app.pendingIFrames[keys[i]];
-            if ((Date.now()-iframeMeta.date) > app.pendingIFrameTimeoutMillis) {
+        var pending = app.pendingIFrames.length;
+        for (var i=app.pendingIFrames.length-1; i>=0; i--) {
+            var pendingIFrame = app.pendingIFrames[i];
+            if ((Date.now()-pendingIFrame.date) > app.pendingIFrameTimeoutMillis) {
                 pending--;
-                delete app.pendingIFrames[keys[i]];
-                app.abortAndQueueIFrame(iframeMeta.request, iframeMeta.iframe, keys[i], 0);
+				app.pendingIFrames.splice(app.pendingIFrames.indexOf(pendingIFrame), 1);
+				app.abortAndQueueIFrame(pendingIFrame.request, pendingIFrame.iframe, pendingIFrame.src, 0);
             }
         }
         if (pending > 0) {
@@ -34,14 +33,15 @@ var app = {
     loadIFrame: function(iframe, src) {
         console.log(Date.now() + ': Loading ' + src);
         var request = new XMLHttpRequest();
-        app.pendingIFrames[src] = {request: request, iframe: iframe, date: Date.now()};
+        var pendingIFrame = {request: request, iframe: iframe, src: src, date: Date.now()};
+        app.pendingIFrames.push(pendingIFrame);
         if (! app.pendingIFrameTimer) {
             app.pendingIFrameTimer = setTimeout(app.processPendingIFrames, app.pendingIFrameTimeMillis);
         }
         request.onload = function () {
             if (this.status >= 200 && this.status < 400) {
                 console.log(Date.now() + ': ' + src + ' loaded.');
-                delete app.pendingIFrames[src];
+				app.pendingIFrames.splice(app.pendingIFrames.indexOf(pendingIFrame), 1);
                 setTimeout(function() {
                     iframe.src = src;
                 }, 0);
@@ -121,11 +121,11 @@ var app = {
         var tab = app.getTab('editor','editor-iframe');
         tabs.appendChild(tab);
         app.addedTabs.push(tab);
-        for (var i = 0; i < upResponse.dockerComposeUrls.length; i++) {
+        for (var i = 0; i < upResponse.tabs.length; i++) {
             var tabId = 'proxy' + i;
             var iframeId = 'proxy' + i + '-iframe';
             // add nav item
-            navItem = app.getListItem(tabId,upResponse.dockerComposeNames[i]+'');
+            navItem = app.getListItem(tabId,upResponse.tabs[i].name+'');
             navItems.appendChild(navItem);
             app.addedNavItems.push(navItem);
             // add tab
@@ -133,7 +133,7 @@ var app = {
             tabs.appendChild(tab);
             app.addedTabs.push(tab);
             // queue iframe
-            app.queueIFrame(document.getElementById(iframeId), upResponse.dockerComposeUrls[i], app.pendingIFrameSleepTimeMillis);
+            app.queueIFrame(document.getElementById(iframeId), upResponse.tabs[i].url, app.pendingIFrameSleepTimeMillis);
         }
         // deploy to bluemix
         if (upResponse.deployToBluemix) {

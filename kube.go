@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"strconv"
@@ -17,9 +18,6 @@ import (
 
 	"gopkg.in/yaml.v2"
 )
-
-var DC_PORT_NAME_PREFIX = "com.exampleup.proxy.name."
-var DC_PORT_PATH_PREFIX = "com.exampleup.proxy.path."
 
 var VAR_PV_NAME string = "$pvName"
 var VAR_PV_PATH string = "$pvPath"
@@ -135,6 +133,40 @@ type DeleteServiceResponse struct {
 	Kind string `json:"kind"`
 }
 
+type ExampleUpConfig struct {
+	Editor *ExampleUpConfigEditor `json:"editor"`
+	Proxy *ExampleUpConfigProxy `json:"proxy"`
+}
+
+type ExampleUpConfigEditor struct {
+	Hide bool `json:"hide"`
+	SrcDir string `json:"srcDir"`
+}
+
+type ExampleUpConfigProxy struct {
+	Ports *[]ExampleUpConfigProxyPort `json:"ports"`
+}
+
+type ExampleUpConfigProxyPort struct {
+	Port int `json:"port"`
+	Hide bool `json:"hide"`
+	Name string `json:"name"`
+	Path string `json:"path"`
+	Tabs *[]ExampleUpConfigProxyPortTab `json:"tabs"`
+}
+
+type ExampleUpConfigProxyPortTab struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
+
+type Tab struct {
+	Port int `json:"port"`
+	Url string `json:"url"`
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
+
 type DeploymentDetails struct {
 	NodeHostName string
 	LogPort int
@@ -142,9 +174,7 @@ type DeploymentDetails struct {
 	EditorPort int
 	EditorUrl string
 	ProxyPort int
-	DockerComposeNames []string
-	DockerComposePorts []int
-	DockerComposeUrls []string
+	Tabs *[]*Tab
 }
 
 func getHttpClient() *http.Client {
@@ -591,15 +621,30 @@ func deleteExample(userId string, kubeServiceToken string, kubeServiceBaseUrl st
 func deployExample(userId string, gitRepo string, pvTemplate string, pvcTemplate string, deploymentTemplate string, serviceTemplate string, kubeServiceToken string, kubeServiceBaseUrl string) (*DeploymentDetails, error) {
 	// delete example, if it exists
 	deleteExample(userId, kubeServiceToken, kubeServiceBaseUrl)
-	// download docker-compose yaml
-	dockerComposePorts := []int{}
-	dockerComposeNames := make(map[string]string)
-	dockerComposePaths := make(map[string]string)
-	url := fmt.Sprintf("%s/raw/master/docker-compose.yml", gitRepo)
-	log.Printf("Downloading docker-compose file from '%s'...\n", url)
+	// download exampleup.json
+	var exampleupConfig ExampleUpConfig
+	exampleupConfigUrl := fmt.Sprintf("%s/raw/master/exampleup.json", gitRepo)
+	log.Printf("Downloading exampleup config from '%s'...\n", exampleupConfigUrl)
 	client := getHttpClient()
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", exampleupConfigUrl, nil)
 	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("Error downloading exampleup config: ", err)
+	} else {
+		err = json.NewDecoder(resp.Body).Decode(&exampleupConfig)
+		if err != nil {
+			log.Println("Error downloading exampleup config: ", err)
+		} else {
+
+		}
+	}
+	// download docker-compose yaml
+	tabs := []*Tab{}
+	dockerComposeUrl := fmt.Sprintf("%s/raw/master/docker-compose.yml", gitRepo)
+	log.Printf("Downloading docker-compose file from '%s'...\n", dockerComposeUrl)
+	client = getHttpClient()
+	req, err = http.NewRequest("GET", dockerComposeUrl, nil)
+	resp, err = client.Do(req)
 	if err != nil {
 		log.Println("Error downloading docker-compose file: ", err)
 		return nil, err
@@ -616,7 +661,54 @@ func deployExample(userId string, gitRepo string, pvTemplate string, pvcTemplate
 				return nil, err
 			} else {
 				for k, v := range m {
-					populateDockerComposePorts(v, &dockerComposePorts, &dockerComposeNames, &dockerComposePaths, k.(string))
+					populateTabs(v, &tabs, k.(string))
+				}
+			}
+		}
+	}
+	// populate docker compose names and paths
+	if exampleupConfig.Proxy != nil && exampleupConfig.Proxy.Ports != nil && len(*exampleupConfig.Proxy.Ports) > 0 {
+		for _, proxyPort := range *exampleupConfig.Proxy.Ports {
+			if proxyPort.Hide == true {
+				// TODO:
+			} else if proxyPort.Tabs != nil && len(*proxyPort.Tabs) > 0 {
+				for i, proxyTab := range *proxyPort.Tabs {
+					if i == 0 {
+						// update the original docker compose port
+						for _, tab := range tabs {
+							if tab.Port == proxyPort.Port {
+								if proxyTab.Name != "" {
+									tab.Name = proxyTab.Name
+								}
+								if proxyTab.Path != "" {
+									tab.Path = proxyTab.Path
+								}
+							}
+						}
+					} else {
+						// add other docker compose ports
+						tab := &Tab{}
+						tab.Port = proxyPort.Port
+						tab.Name = strconv.Itoa(proxyPort.Port)
+						tabs = append(tabs, tab)
+						if proxyTab.Name != "" {
+							tab.Name = proxyTab.Name
+						}
+						if proxyTab.Path != "" {
+							tab.Path = proxyTab.Path
+						}
+					}
+				}
+			} else {
+				for _, tab := range tabs {
+					if tab.Port == proxyPort.Port {
+						if proxyPort.Name != "" {
+							tab.Name = proxyPort.Name
+						}
+						if proxyPort.Path != "" {
+							tab.Path = proxyPort.Path
+						}
+					}
 				}
 			}
 		}
@@ -696,7 +788,6 @@ func deployExample(userId string, gitRepo string, pvTemplate string, pvcTemplate
 			if element.Name == "proxy" {
 				proxyNodePort = element.NodePort
 			}
-			// element is the element from someSlice for where we are
 		}
 		details := &DeploymentDetails{}
 		details.NodeHostName = os.Getenv("EXUP_NODE_HOST_NAME") // mw:TODO
@@ -704,62 +795,47 @@ func deployExample(userId string, gitRepo string, pvTemplate string, pvcTemplate
 		details.LogUrl = fmt.Sprintf("http://%s:%d", details.NodeHostName, details.LogPort)
 		details.EditorPort = editorNodePort
 		details.EditorUrl = fmt.Sprintf("http://%s:%d", details.NodeHostName, details.EditorPort)
-		details.ProxyPort = proxyNodePort
-		details.DockerComposePorts = dockerComposePorts
-		for _, element := range details.DockerComposePorts {
-			name := dockerComposeNames[strconv.Itoa(element)]
-			if name == "" {
-				name = strconv.Itoa(element)
-			}
-			path := dockerComposePaths[strconv.Itoa(element)]
-			details.DockerComposeNames = append(details.DockerComposeNames, name)
-			details.DockerComposeUrls = append(details.DockerComposeUrls, fmt.Sprintf("http://%d.%s:%d%s",element,details.NodeHostName,details.ProxyPort,path))
+		if exampleupConfig.Editor.SrcDir != "" {
+			details.EditorUrl += "?src=" + url.QueryEscape(exampleupConfig.Editor.SrcDir)
 		}
+		details.ProxyPort = proxyNodePort
+		for _, tab := range tabs {
+			tab.Url = fmt.Sprintf("http://%d.%s:%d%s",tab.Port,details.NodeHostName,details.ProxyPort,tab.Path)
+		}
+		details.Tabs = &tabs
 		return details, nil
 	}
 }
 
-func populateDockerComposePorts(v interface{}, ports *[]int, names *map[string]string, paths *map[string]string, parent string) {
+func populateTabs(v interface{}, tabs *[]*Tab, parent string) {
 	typ := reflect.TypeOf(v).Kind()
 	if typ == reflect.String {
 		if parent == "ports" {
 			portString := strings.SplitN(v.(string), ":", 2)[0]
 			port, err := strconv.Atoi(portString)
 			if err == nil {
-				*ports = append(*ports, port)
-			}
-		} else if parent == "labels" {
-			str := v.(string)
-			if strings.Contains(str, DC_PORT_NAME_PREFIX) {
-				str = strings.TrimPrefix(str, DC_PORT_NAME_PREFIX)
-				strs := strings.SplitN(str, ":", 2)
-				portStr := strs[0]
-				nameStr := strs[1]
-				(*names)[portStr] = nameStr
-			} else if strings.Contains(str, DC_PORT_PATH_PREFIX) {
-				str = strings.TrimPrefix(str, DC_PORT_PATH_PREFIX)
-				strs := strings.SplitN(str, ":", 2)
-				portStr := strs[0]
-				pathStr := strs[1]
-				(*paths)[portStr] = pathStr
+				tab := &Tab{}
+				tab.Port = port
+				tab.Name = strconv.Itoa(port)
+				*tabs = append(*tabs, tab)
 			}
 		}
 	} else if typ == reflect.Slice {
-		populateDockerComposePortsSlice(v.([]interface{}), ports, names, paths, parent)
+		populateTabsSlice(v.([]interface{}), tabs, parent)
 	} else if typ == reflect.Map {
-		populateDockerComposePortsMap(v.(map[interface{}]interface{}), ports, names, paths)
+		populateTabsMap(v.(map[interface{}]interface{}), tabs)
 	}
 }
 
-func populateDockerComposePortsMap(m map[interface{}]interface{}, ports *[]int, names *map[string]string, paths *map[string]string) {
+func populateTabsMap(m map[interface{}]interface{}, tabs *[]*Tab) {
 	for k, v := range m {
-		populateDockerComposePorts(v, ports, names, paths, strings.ToLower(k.(string)))
+		populateTabs(v, tabs, strings.ToLower(k.(string)))
 	}
 }
 
-func populateDockerComposePortsSlice(slc []interface{}, ports *[]int, names *map[string]string, paths *map[string]string, parent string) {
+func populateTabsSlice(slc []interface{}, tabs *[]*Tab, parent string) {
 	for _, v := range slc {
-		populateDockerComposePorts(v, ports, names, paths, parent)
+		populateTabs(v, tabs, parent)
 	}
 }
 
