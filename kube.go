@@ -795,7 +795,7 @@ func deployExample(userId string, gitRepo string, pvTemplate string, pvcTemplate
 		details.LogUrl = fmt.Sprintf("http://%s:%d", details.NodeHostName, details.LogPort)
 		details.EditorPort = editorNodePort
 		details.EditorUrl = fmt.Sprintf("http://%s:%d", details.NodeHostName, details.EditorPort)
-		if exampleupConfig.Editor.SrcDir != "" {
+		if exampleupConfig.Editor != nil && exampleupConfig.Editor.SrcDir != "" {
 			details.EditorUrl += "?src=" + url.QueryEscape(exampleupConfig.Editor.SrcDir)
 		}
 		details.ProxyPort = proxyNodePort
