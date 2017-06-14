@@ -111,16 +111,19 @@ var app = {
     processUpResponse: function(upResponse) {
         document.getElementById('repo-btn').disabled = false;
         document.getElementById('log-iframe').contentWindow.document.write("<html><body style='font-family: -apple-system,system-ui,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,sans-serif' font-size: 11pt;'><pre>Please wait...this may take a minute or two...</pre></body></html>");
-        // add nav item for editor
-        var navItems = document.getElementById('nav-items');
-        var navItem = app.getListItem("editor",'Editor');
-        navItems.appendChild(navItem);
-        app.addedNavItems.push(navItem);
-        // add tab for editor
-        var tabs = document.getElementById('tabs');
-        var tab = app.getTab('editor','editor-iframe');
-        tabs.appendChild(tab);
-        app.addedTabs.push(tab);
+		var navItems = document.getElementById('nav-items');
+		var tabs = document.getElementById('tabs');
+		var showEditor = (upResponse.editorUrl && upResponse.editorUrl.length > 0);
+        if (showEditor) {
+			// add nav item for editor
+			var navItem = app.getListItem("editor", 'Editor');
+			navItems.appendChild(navItem);
+			app.addedNavItems.push(navItem);
+			// add tab for editor
+			var tab = app.getTab('editor', 'editor-iframe');
+			tabs.appendChild(tab);
+			app.addedTabs.push(tab);
+		}
         for (var i = 0; i < upResponse.tabs.length; i++) {
             var tabId = 'proxy' + i;
             var iframeId = 'proxy' + i + '-iframe';
@@ -155,9 +158,11 @@ var app = {
             tabs.appendChild(tab);
             app.addedTabs.push(tab);
         }
-        //
-        app.queueIFrame(document.getElementById('editor-iframe'), upResponse.editorUrl, app.pendingIFrameSleepTimeMillis);
-        app.queueIFrame(document.getElementById('log-iframe'), upResponse.logUrl, app.pendingIFrameSleepTimeMillis);
+        // queue log and editor (if enabled)
+		app.queueIFrame(document.getElementById('log-iframe'), upResponse.logUrl, app.pendingIFrameSleepTimeMillis);
+        if (showEditor) {
+			app.queueIFrame(document.getElementById('editor-iframe'), upResponse.editorUrl, app.pendingIFrameSleepTimeMillis);
+		}
     },
 
     preUp: function() {

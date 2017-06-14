@@ -30,7 +30,7 @@ spec:
               fieldRef:
                 fieldPath: spec.nodeName
           - name: EXUP_STORAGE_DRIVER
-            value: "aufs"
+            value: "$storageDriver"
           - name: EXUP_LOG_PORT
             value: "$logPort"
           - name: EXUP_EDITOR_PORT

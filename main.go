@@ -18,6 +18,8 @@ var exampleDeploymentTemplate string
 var exampleServiceTemplate string
 var kubeServiceToken string
 var kubeServiceBaseUrl string
+var kubeNamespace string
+var storageDriver string
 
 type Deployment struct {
 	UserId string
@@ -67,7 +69,7 @@ func ping(w http.ResponseWriter, r *http.Request) {
 		pingResponse.Up = true
 		if pingRequest.GetUpDetails {
 			// make sure to check if it is really running
-			exists, err := isExampleDeployed(pingRequest.UserId, kubeServiceToken, kubeServiceBaseUrl)
+			exists, err := isExampleDeployed(pingRequest.UserId, kubeServiceToken, kubeServiceBaseUrl, kubeNamespace)
 			if err != nil {
 				http.Error(w, err.Error(), 400)
 				return
@@ -104,8 +106,9 @@ func up(w http.ResponseWriter, r *http.Request) {
 	var upResponse *UpResponse
 	// call kubernetes
 	log.Printf("Checking if deployment exists for user '%s'...\n", upRequest.UserId)
-	exists, err := isExampleDeployed(upRequest.UserId, kubeServiceToken, kubeServiceBaseUrl)
+	exists, err := isExampleDeployed(upRequest.UserId, kubeServiceToken, kubeServiceBaseUrl, kubeNamespace)
 	if err != nil {
+		log.Printf("Error checking if deployment exists for user '%s': %s\n", upRequest.UserId, err)
 		http.Error(w, err.Error(), 400)
 		return
 	} else if exists {
@@ -118,7 +121,7 @@ func up(w http.ResponseWriter, r *http.Request) {
 	}
 	if upResponse == nil  {
 		log.Println("Creating new deployment...")
-		details, err := deployExample(upRequest.UserId, upRequest.Repo, examplePvTemplate, examplePvcTemplate, exampleDeploymentTemplate, exampleServiceTemplate, kubeServiceToken, kubeServiceBaseUrl)
+		details, err := deployExample(upRequest.UserId, upRequest.Repo, storageDriver, examplePvTemplate, examplePvcTemplate, exampleDeploymentTemplate, exampleServiceTemplate, kubeServiceToken, kubeServiceBaseUrl, kubeNamespace)
 		if err != nil {
 			log.Print("Error creating deployment: ", err)
 			http.Error(w, err.Error(), 400)
@@ -194,6 +197,14 @@ func main() {
 	kubeServiceBaseUrl += kubeServiceHost
 	kubeServiceBaseUrl += ":"
 	kubeServiceBaseUrl += kubeServicePort
+	kubeNamespace = os.Getenv("EXUP_NAMESPACE")
+	if kubeNamespace == "" {
+		kubeNamespace = "default"
+	}
+	storageDriver = os.Getenv("EXUP_STORAGE_DRIVER")
+	if storageDriver == "" {
+		storageDriver = "aufs"
+	}
 	staticFileHandler := http.FileServer(http.Dir("public"))
 	http.HandleFunc("/api/ping", ping)
 	http.HandleFunc("/api/up", up)
