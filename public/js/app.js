@@ -204,7 +204,7 @@ var app = {
                 console.log('Error deploying repo.');
             }
         };
-        request.open('POST', '/api/up', true);
+        request.open('POST', apiBaseUrl + '/api/up', true);
         request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
         request.send(json);
     },
@@ -226,7 +226,7 @@ var app = {
                 console.log('Error pinging server.');
             }
         };
-        request.open('POST', '/api/ping', true);
+        request.open('POST', apiBaseUrl + '/api/ping', true);
         request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
         request.send(json);
     },
@@ -271,7 +271,7 @@ var app = {
                 localStorage.setItem('userId', app.userId);
             }
         }
-        // wire up events
+		// wire up events
         document.getElementById('repo-input').addEventListener('keypress', function(e) {
             if (e.keyCode === 13) {
                 e.preventDefault();
@@ -283,10 +283,17 @@ var app = {
             app.repo = document.getElementById('repo-input').value;
             app.up();
         });
+		// get repo
+		var repo = app.getParameterByName('repo');
+		if (repo && repo.length > 0) {
+			document.getElementById('repo-input').value = repo;
+			app.repo = repo;
+			app.up();
+		}
         // periodically ping the server to signal that we are still alive
         // server will tear down any pods for users not actively running
         app.onTimer();
-    },
+	},
 
     onTimer: function() {
         app.ping();
