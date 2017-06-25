@@ -1,5 +1,6 @@
 var app = {
 
+    apiUrl: '$apiUrl',
     userId: null,
     repo: undefined,
     pingTimeMillis: 30000,
@@ -204,7 +205,7 @@ var app = {
                 console.log('Error deploying repo.');
             }
         };
-        request.open('POST', apiBaseUrl + '/api/up', true);
+        request.open('POST', app.apiUrl + '/api/up', true);
         request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
         request.send(json);
     },
@@ -226,7 +227,7 @@ var app = {
                 console.log('Error pinging server.');
             }
         };
-        request.open('POST', apiBaseUrl + '/api/ping', true);
+        request.open('POST', app.apiUrl + '/api/ping', true);
         request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
         request.send(json);
     },
