@@ -258,6 +258,16 @@ var app = {
     },
 
     init: function() {
+        // fix api url
+        if (app.apiUrl == '$apiUrl') {
+            api = app.getParameterByName('api');
+            if (api) {
+				app.apiUrl = api;
+            }
+            else {
+                app.apiUrl = 'http://localhost:8080';
+            }
+        }
         // get userId
         var userId = app.getParameterByName('id');
         if (userId && userId.length > 0) {
