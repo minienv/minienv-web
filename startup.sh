@@ -1,5 +1,5 @@
 #!/bin/sh
-apiUrl=${EXUP_API_URL}
+apiUrl=${MINIENV_API_URL}
 if [[ -z  ${apiUrl} ]]; then
     apiUrl=""
 fi
