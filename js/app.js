@@ -259,7 +259,7 @@ var app = {
 
     init: function() {
         // fix api url
-        if (app.apiUrl == '$apiUrl') {
+        if (app.apiUrl.startsWith('$')) {
             api = app.getParameterByName('api');
             if (api) {
 				app.apiUrl = api;
