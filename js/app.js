@@ -3,10 +3,10 @@ var app = {
     apiUrl: '$apiUrl',
     claimGranted: false,
     claimToken: null,
-    repo: undefined,
+    repo: '',
 	requestedRepo: undefined,
 	claimTimeMillis: 5000,
-    pingTimeMillis: 30000,
+    pingTimeMillis: 15000,
     pendingIFrameSleepTimeMillis: 100,
     pendingIFrames : [],
     pendingIFrameTimer: null,
@@ -169,11 +169,15 @@ var app = {
 		}
     },
 
-    preUp: function() {
-        // reset ui
+	enableTabs: function() {
+		document.getElementById('repo-btn').disabled = false;
+	},
+
+    clearAndDisableTabs: function() {
         document.getElementById('log-iframe').src = 'about:blank';
         document.getElementById('repo-btn').disabled = true;
-        if (app.addedTabs.length > 0) {
+		document.getElementById('repo-input').value = app.repo;
+		if (app.addedTabs.length > 0) {
             var tabs = document.getElementById('tabs');
             for (var i=0; i<app.addedTabs.length; i++) {
                 tabs.removeChild(app.addedTabs[i]);
@@ -190,7 +194,7 @@ var app = {
     },
 
     up: function() {
-        app.preUp();
+        app.clearAndDisableTabs();
         // make request to server
         var request = new XMLHttpRequest();
         var json = JSON.stringify({
@@ -232,8 +236,8 @@ var app = {
 					}
 					else if (pingResponse.upDetails) {
 						app.repo = pingResponse.upDetails.repo;
+						app.clearAndDisableTabs();
 						document.getElementById('repo-input').value = app.repo;
-						app.preUp();
 						app.processUpResponse(pingResponse.upDetails);
 					}
 				}
@@ -352,10 +356,12 @@ var app = {
 
     updateUIOnClaimGrantedChange: function() {
         if (app.claimGranted) {
+			app.enableTabs();
 			document.getElementById('claim-container').style.visibility = 'hidden';
 			document.getElementById('tab-container').style.visibility = 'visible';
         }
         else {
+        	app.clearAndDisableTabs();
 			document.getElementById('tab-container').style.visibility = 'hidden';
 			document.getElementById('claim-container').style.visibility = 'visible';
 		}

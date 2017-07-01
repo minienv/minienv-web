@@ -36,6 +36,11 @@ html, body {
 	flex: 1 0 auto;
 }
 
+#claim-container {
+	padding: 10px;
+	margin: 0px;
+}
+
 #tab-container {
 	width: 100%;
 	height: 100%;
