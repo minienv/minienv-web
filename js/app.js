@@ -1,9 +1,12 @@
 var app = {
 
     apiUrl: '$apiUrl',
-    userId: null,
-    repo: undefined,
-    pingTimeMillis: 30000,
+    claimGranted: false,
+    claimToken: null,
+    repo: '',
+	requestedRepo: undefined,
+	claimTimeMillis: 5000,
+    pingTimeMillis: 15000,
     pendingIFrameSleepTimeMillis: 100,
     pendingIFrames : [],
     pendingIFrameTimer: null,
@@ -166,11 +169,15 @@ var app = {
 		}
     },
 
-    preUp: function() {
-        // reset ui
+	enableTabs: function() {
+		document.getElementById('repo-btn').disabled = false;
+	},
+
+    clearAndDisableTabs: function() {
         document.getElementById('log-iframe').src = 'about:blank';
         document.getElementById('repo-btn').disabled = true;
-        if (app.addedTabs.length > 0) {
+		document.getElementById('repo-input').value = app.repo;
+		if (app.addedTabs.length > 0) {
             var tabs = document.getElementById('tabs');
             for (var i=0; i<app.addedTabs.length; i++) {
                 tabs.removeChild(app.addedTabs[i]);
@@ -187,11 +194,11 @@ var app = {
     },
 
     up: function() {
-        app.preUp();
+        app.clearAndDisableTabs();
         // make request to server
         var request = new XMLHttpRequest();
         var json = JSON.stringify({
-            userId: app.userId,
+            claimToken: app.claimToken,
             repo: app.repo
         });
         request.onload = function() {
@@ -210,36 +217,66 @@ var app = {
         request.send(json);
     },
 
-    ping: function() {
+    ping: function(callback) {
         var request = new XMLHttpRequest();
-        var json = JSON.stringify({userId: app.userId, getUpDetails: ! app.repo});
+        var json = JSON.stringify({claimToken: app.claimToken, getUpDetails: ! app.repo});
         request.onload = function() {
             if (this.status >= 200 && this.status < 400) {
                 var pingResponse = JSON.parse(this.responseText);
-                if (pingResponse.upDetails) {
-                    app.repo = pingResponse.upDetails.repo;
-                    document.getElementById('repo-input').value = app.repo;
-                    app.preUp();
-                    app.processUpResponse(pingResponse.upDetails);
+                if (! pingResponse.claimGranted) {
+                    app.claimGranted = false;
+                    app.claimToken = null;
+                    app.onClaimGrantedChanged();
+					return app.claim(callback);
                 }
+                else {
+					if (!app.claimGranted) {
+						app.claimGranted = true;
+                        app.onClaimGrantedChanged();
+					}
+					else if (pingResponse.upDetails) {
+						app.repo = pingResponse.upDetails.repo;
+						app.clearAndDisableTabs();
+						document.getElementById('repo-input').value = app.repo;
+						app.processUpResponse(pingResponse.upDetails);
+					}
+				}
             }
             else {
                 console.log('Error pinging server.');
             }
+			callback();
         };
         request.open('POST', app.apiUrl + '/api/ping', true);
         request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
         request.send(json);
     },
 
-    generateUniqueId: function(len) {
-        var ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        var id = '';
-        for (var i = 0; i < len; i++) {
-            id += ALPHABET.charAt(Math.floor(Math.random() * ALPHABET.length));
-        }
-        return id;
-    },
+	claim: function(callback) {
+		var request = new XMLHttpRequest();
+		var json = JSON.stringify({authorization: 'TODO'});
+		request.onload = function() {
+			if (this.status >= 200 && this.status < 400) {
+				var claimResponse = JSON.parse(this.responseText);
+				if (claimResponse.claimGranted) {
+				    app.claimGranted = true;
+					app.claimToken = claimResponse.claimToken;
+					app.onClaimGrantedChanged();
+				}
+				else {
+				    console.log('Claim rejected: ' + claimResponse.message);
+					app.updateUIOnClaimGrantedChange();
+                }
+			}
+			else {
+				console.log('Error pinging server.');
+			}
+			callback();
+		};
+		request.open('POST', app.apiUrl + '/api/claim', true);
+		request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+		request.send(json);
+	},
 
     getParameterByName: function(name, url) {
         if (!url) {
@@ -268,19 +305,15 @@ var app = {
                 app.apiUrl = 'http://localhost:8080';
             }
         }
-        // get userId
-        var userId = app.getParameterByName('id');
-        if (userId && userId.length > 0) {
-            app.userId = userId;
+        // get repo from query string
+		app.requestedRepo = app.getParameterByName('repo');
+        // get claimToken
+        var claimToken = app.getParameterByName('token');
+        if (claimToken && claimToken.length > 0) {
+            app.claimToken = claimToken;
         }
-        if (!app.userId && typeof(Storage) !== 'undefined') {
-            app.userId = localStorage.getItem('userId');
-        }
-        if (!app.userId) {
-            app.userId = app.generateUniqueId(8);
-            if (typeof(Storage) !== 'undefined') {
-                localStorage.setItem('userId', app.userId);
-            }
+        if (!app.claimToken && typeof(Storage) !== 'undefined') {
+            app.claimToken = localStorage.getItem('claimToken');
         }
 		// wire up events
         document.getElementById('repo-input').addEventListener('keypress', function(e) {
@@ -294,21 +327,57 @@ var app = {
             app.repo = document.getElementById('repo-input').value;
             app.up();
         });
-		// get repo
-		var repo = app.getParameterByName('repo');
-		if (repo && repo.length > 0) {
-			document.getElementById('repo-input').value = repo;
-			app.repo = repo;
-			app.up();
-		}
         // periodically ping the server to signal that we are still alive
         // server will tear down any pods for users not actively running
         app.onTimer();
 	},
 
+    onClaimGrantedChanged: function() {
+        if (app.claimGranted) {
+			if (typeof(Storage) !== 'undefined') {
+				localStorage.setItem('claimToken', app.claimToken);
+			}
+			// check if repo supplied in url and automatically load
+			if (app.requestedRepo && app.requestedRepo.length > 0) {
+				document.getElementById('repo-input').value = repo;
+				app.repo = app.requestedRepo;
+				app.requestedRepo = undefined;
+				app.up();
+			}
+        }
+        else {
+			app.claimToken = null;
+			if (typeof(Storage) !== 'undefined') {
+				localStorage.removeItem('claimToken');
+			}
+        }
+		app.updateUIOnClaimGrantedChange();
+	},
+
+    updateUIOnClaimGrantedChange: function() {
+        if (app.claimGranted) {
+			app.enableTabs();
+			document.getElementById('claim-container').style.visibility = 'hidden';
+			document.getElementById('tab-container').style.visibility = 'visible';
+        }
+        else {
+        	app.clearAndDisableTabs();
+			document.getElementById('tab-container').style.visibility = 'hidden';
+			document.getElementById('claim-container').style.visibility = 'visible';
+		}
+    },
+
     onTimer: function() {
-        app.ping();
-        setTimeout(app.onTimer, app.pingTimeMillis);
+        if (! app.claimToken && ! app.claimGranted) {
+            app.claim(function() {
+				setTimeout(app.onTimer, app.claimTimeMillis);
+            });
+        }
+        else {
+			app.ping(function() {
+				setTimeout(app.onTimer, app.pingTimeMillis);
+			});
+		}
     }
 };
 
