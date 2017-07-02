@@ -112,12 +112,12 @@ var app = {
         return div;
     },
 
-    processUpResponse: function(upResponse) {
+    processEnvUpResponse: function(envUpResponse) {
         document.getElementById('repo-btn').disabled = false;
         document.getElementById('log-iframe').contentWindow.document.write("<html><body style='font-family: -apple-system,system-ui,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,sans-serif' font-size: 11pt;'><pre>Please wait...this may take a minute or two...</pre></body></html>");
 		var navItems = document.getElementById('nav-items');
 		var tabs = document.getElementById('tabs');
-		var showEditor = (upResponse.editorUrl && upResponse.editorUrl.length > 0);
+		var showEditor = (envUpResponse.editorUrl && envUpResponse.editorUrl.length > 0);
         if (showEditor) {
 			// add nav item for editor
 			var navItem = app.getListItem("editor", 'Editor');
@@ -128,11 +128,11 @@ var app = {
 			tabs.appendChild(tab);
 			app.addedTabs.push(tab);
 		}
-        for (var i = 0; i < upResponse.tabs.length; i++) {
+        for (var i = 0; i < envUpResponse.tabs.length; i++) {
             var tabId = 'proxy' + i;
             var iframeId = 'proxy' + i + '-iframe';
             // add nav item
-            navItem = app.getListItem(tabId,upResponse.tabs[i].name+'');
+            navItem = app.getListItem(tabId,envUpResponse.tabs[i].name+'');
             navItems.appendChild(navItem);
             app.addedNavItems.push(navItem);
             // add tab
@@ -140,10 +140,10 @@ var app = {
             tabs.appendChild(tab);
             app.addedTabs.push(tab);
             // queue iframe
-            app.queueIFrame(document.getElementById(iframeId), upResponse.tabs[i].url, app.pendingIFrameSleepTimeMillis);
+            app.queueIFrame(document.getElementById(iframeId), envUpResponse.tabs[i].url, app.pendingIFrameSleepTimeMillis);
         }
         // deploy to bluemix
-        if (upResponse.deployToBluemix) {
+        if (envUpResponse.deployToBluemix) {
             var tabId = 'deploy';
             // add nav item
             navItem = app.getListItem(tabId,'Deploy');
@@ -163,9 +163,9 @@ var app = {
             app.addedTabs.push(tab);
         }
         // queue log and editor (if enabled)
-		app.queueIFrame(document.getElementById('log-iframe'), upResponse.logUrl, app.pendingIFrameSleepTimeMillis);
+		app.queueIFrame(document.getElementById('log-iframe'), envUpResponse.logUrl, app.pendingIFrameSleepTimeMillis);
         if (showEditor) {
-			app.queueIFrame(document.getElementById('editor-iframe'), upResponse.editorUrl, app.pendingIFrameSleepTimeMillis);
+			app.queueIFrame(document.getElementById('editor-iframe'), envUpResponse.editorUrl, app.pendingIFrameSleepTimeMillis);
 		}
     },
 
@@ -204,8 +204,8 @@ var app = {
         request.onload = function() {
             document.getElementById('repo-btn').disabled = false;
             if (this.status >= 200 && this.status < 400) {
-                var upResponse = JSON.parse(this.responseText);
-                app.processUpResponse(upResponse);
+                var envUpResponse = JSON.parse(this.responseText);
+                app.processEnvUpResponse(envUpResponse);
             }
             else {
                 document.getElementById('log-iframe').contentWindow.document.write("<html><body style='font-family: -apple-system,system-ui,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,sans-serif' font-size: 11pt;'><pre>Error deploying repo. Please try again...</pre></body></html>");
@@ -219,7 +219,7 @@ var app = {
 
     ping: function(callback) {
         var request = new XMLHttpRequest();
-        var json = JSON.stringify({claimToken: app.claimToken, getUpDetails: ! app.repo});
+        var json = JSON.stringify({claimToken: app.claimToken, getEnvDetails: ! app.repo});
         request.onload = function() {
             if (this.status >= 200 && this.status < 400) {
                 var pingResponse = JSON.parse(this.responseText);
@@ -234,11 +234,11 @@ var app = {
 						app.claimGranted = true;
                         app.onClaimGrantedChanged();
 					}
-					else if (pingResponse.upDetails) {
-						app.repo = pingResponse.upDetails.repo;
+					if (pingResponse.envDetails) {
+						app.repo = pingResponse.repo;
 						app.clearAndDisableTabs();
 						document.getElementById('repo-input').value = app.repo;
-						app.processUpResponse(pingResponse.upDetails);
+						app.processEnvUpResponse(pingResponse.envDetails);
 					}
 				}
             }
@@ -295,6 +295,10 @@ var app = {
     },
 
     init: function() {
+    	// warn when leaving
+		window.onbeforeunload = function() {
+			return true;
+		};
         // fix api url
         if (app.apiUrl.startsWith('$')) {
             api = app.getParameterByName('api');
@@ -357,13 +361,13 @@ var app = {
     updateUIOnClaimGrantedChange: function() {
         if (app.claimGranted) {
 			app.enableTabs();
-			document.getElementById('claim-container').style.visibility = 'hidden';
-			document.getElementById('tab-container').style.visibility = 'visible';
+			document.getElementById('claim-container').style.display = 'none';
+			document.getElementById('tab-container').style.display = 'block';
         }
         else {
         	app.clearAndDisableTabs();
-			document.getElementById('tab-container').style.visibility = 'hidden';
-			document.getElementById('claim-container').style.visibility = 'visible';
+			document.getElementById('tab-container').style.display = 'none';
+			document.getElementById('claim-container').style.display = 'block';
 		}
     },
 

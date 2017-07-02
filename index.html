@@ -2,16 +2,18 @@
 <html lang="en">
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <link rel="stylesheet" href="css/app.css">
+    <link href="https://fonts.googleapis.com/css?family=Patrick+Hand|Open+Sans" rel="stylesheet">
     <link rel="stylesheet" href="css/bootstrap-4.0.0-alpha.6.min.css">
+    <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
 
 <div id="app">
-    <div id="claim-container" style="visibility: visible">
+    <div id="title"><h1>minienv</h1></div>
+    <div id="claim-container" style="display: block">
         Waiting for available environment...
     </div>
-    <div id="tab-container" style="visibility: hidden">
+    <div id="tab-container" style="display: none">
         <ul id="nav-items" class="nav nav-tabs" role="tablist">
             <li class="nav-item">
                 <a class="nav-link active" data-toggle="tab" href="#main" role="tab">Run</a>
@@ -22,7 +24,7 @@
                 <div id="main-container">
                     <div id="main-repo-container">
                         <input id="repo-input" class="form-control" aria-label="Enter your repo..." class="input_text" type="text" autocomplete="off" placeholder="Enter your repo..." v-model="repo">
-                        <button id="repo-btn" class="btn btn-primary" type="submit">Up</button>
+                        <button id="repo-btn" class="btn btn-secondary" type="submit">Up</button>
                     </div>
                     <div id="main-log-container">
                         <iframe id="log-iframe" style="width: 100%; padding: 10px; border: 0px"></iframe>
