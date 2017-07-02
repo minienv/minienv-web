@@ -47,6 +47,9 @@ var app = {
                 console.log(Date.now() + ': ' + src + ' loaded.');
 				app.pendingIFrames.splice(app.pendingIFrames.indexOf(pendingIFrame), 1);
                 setTimeout(function() {
+                	if (iframe.id == 'log-iframe') {
+                		document.getElementById('log-loading').style.display = 'none';
+					}
                     iframe.src = src;
                 }, 0);
             }
@@ -114,7 +117,7 @@ var app = {
 
     processEnvUpResponse: function(envUpResponse) {
         document.getElementById('repo-btn').disabled = false;
-        document.getElementById('log-iframe').contentWindow.document.write("<html><body style='font-family: -apple-system,system-ui,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,sans-serif' font-size: 11pt;'><pre>Please wait...this may take a minute or two...</pre></body></html>");
+		document.getElementById('log-loading').style.display = 'block';
 		var navItems = document.getElementById('nav-items');
 		var tabs = document.getElementById('tabs');
 		var showEditor = (envUpResponse.editorUrl && envUpResponse.editorUrl.length > 0);
