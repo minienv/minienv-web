@@ -12,7 +12,8 @@ var app = {
     pendingIFrameTimer: null,
     pendingIFrameTimeMillis: 5000,
     pendingIFrameTimeoutMillis: 10000,
-    addedNavItems: [],
+	iframeNavItems: {},
+	addedNavItems: [],
     addedTabs: [],
 
     processPendingIFrames: function() {
@@ -47,8 +48,14 @@ var app = {
                 console.log(Date.now() + ': ' + src + ' loaded.');
 				app.pendingIFrames.splice(app.pendingIFrames.indexOf(pendingIFrame), 1);
                 setTimeout(function() {
-                	if (iframe.id == 'log-iframe') {
-                		document.getElementById('log-loading').style.display = 'none';
+                	if (iframe.id) {
+						if (iframe.id == 'log-iframe') {
+							document.getElementById('log-loading').style.display = 'none';
+							document.getElementById('log-error').style.display = 'none';
+						}
+						if (app.iframeNavItems[iframe.id]) {
+							app.iframeNavItems[iframe.id].style.display = 'block';
+						}
 					}
                     iframe.src = src;
                 }, 0);
@@ -82,7 +89,7 @@ var app = {
         }, timeout);
     },
 
-    getListItem: function(id, title) {
+    getNavItem: function(id, title) {
         var anchorText = document.createTextNode(title);
         var anchor = document.createElement('a');
         anchor.setAttribute('class', 'nav-link');
@@ -90,10 +97,11 @@ var app = {
         anchor.setAttribute('href', '#'+id);
         anchor.setAttribute('role', 'tab');
         anchor.appendChild(anchorText);
-        var listItem = document.createElement('li');
-        listItem.setAttribute('class', 'nav-item');
-        listItem.appendChild(anchor);
-        return listItem;
+        var navItem = document.createElement('li');
+		navItem.setAttribute('class', 'nav-item');
+		navItem.appendChild(anchor);
+		navItem.style.display = 'none';
+        return navItem;
     },
 
     getTab: function(tabId, iframeId) {
@@ -118,13 +126,15 @@ var app = {
     processEnvUpResponse: function(envUpResponse) {
         document.getElementById('repo-btn').disabled = false;
 		document.getElementById('log-loading').style.display = 'block';
+		document.getElementById('log-error').style.display = 'none';
 		var navItems = document.getElementById('nav-items');
 		var tabs = document.getElementById('tabs');
 		var showEditor = (envUpResponse.editorUrl && envUpResponse.editorUrl.length > 0);
         if (showEditor) {
 			// add nav item for editor
-			var navItem = app.getListItem("editor", 'Editor');
+			var navItem = app.getNavItem("editor", 'Editor');
 			navItems.appendChild(navItem);
+			app.iframeNavItems['editor-iframe'] = navItem;
 			app.addedNavItems.push(navItem);
 			// add tab for editor
 			var tab = app.getTab('editor', 'editor-iframe');
@@ -135,10 +145,11 @@ var app = {
             var tabId = 'proxy' + i;
             var iframeId = 'proxy' + i + '-iframe';
             // add nav item
-            navItem = app.getListItem(tabId,envUpResponse.tabs[i].name+'');
+            navItem = app.getNavItem(tabId,envUpResponse.tabs[i].name+'');
             navItems.appendChild(navItem);
-            app.addedNavItems.push(navItem);
-            // add tab
+			app.iframeNavItems[iframeId] = navItem;
+			app.addedNavItems.push(navItem);
+			// add tab
             tab = app.getTab(tabId, iframeId);
             tabs.appendChild(tab);
             app.addedTabs.push(tab);
@@ -146,25 +157,25 @@ var app = {
             app.queueIFrame(document.getElementById(iframeId), envUpResponse.tabs[i].url, app.pendingIFrameSleepTimeMillis);
         }
         // deploy to bluemix
-        if (envUpResponse.deployToBluemix) {
-            var tabId = 'deploy';
-            // add nav item
-            navItem = app.getListItem(tabId,'Deploy');
-            navItems.appendChild(navItem);
-            app.addedNavItems.push(navItem);
-            // add tab
-            var img = document.createElement('img');
-            img.setAttribute('src', 'https://bluemix.net/deploy/button.png');
-            img.setAttribute('alt', 'Deploy to Bluemix');
-            var anchor = document.createElement('a');
-            anchor.setAttribute('href', 'https://bluemix.net/deploy?repository=' + encodeURIComponent(app.repo));
-            anchor.setAttribute('target', '_blank');
-            anchor.appendChild(img);
-            var tabs = document.getElementById('tabs');
-            var tab = app.getTabWithChild(tabId, anchor);
-            tabs.appendChild(tab);
-            app.addedTabs.push(tab);
-        }
+        // if (envUpResponse.deployToBluemix) {
+        //     var tabId = 'deploy';
+        //     // add nav item
+        //     navItem = app.getNavItem(tabId,'Deploy');
+        //     navItems.appendChild(navItem);
+        //     app.addedNavItems.push(navItem);
+        //     // add tab
+        //     var img = document.createElement('img');
+        //     img.setAttribute('src', 'https://bluemix.net/deploy/button.png');
+        //     img.setAttribute('alt', 'Deploy to Bluemix');
+        //     var anchor = document.createElement('a');
+        //     anchor.setAttribute('href', 'https://bluemix.net/deploy?repository=' + encodeURIComponent(app.repo));
+        //     anchor.setAttribute('target', '_blank');
+        //     anchor.appendChild(img);
+        //     var tabs = document.getElementById('tabs');
+        //     var tab = app.getTabWithChild(tabId, anchor);
+        //     tabs.appendChild(tab);
+        //     app.addedTabs.push(tab);
+        // }
         // queue log and editor (if enabled)
 		app.queueIFrame(document.getElementById('log-iframe'), envUpResponse.logUrl, app.pendingIFrameSleepTimeMillis);
         if (showEditor) {
@@ -180,6 +191,7 @@ var app = {
         document.getElementById('log-iframe').src = 'about:blank';
         document.getElementById('repo-btn').disabled = true;
 		document.getElementById('repo-input').value = app.repo;
+		app.iframeNavItems = {};
 		if (app.addedTabs.length > 0) {
             var tabs = document.getElementById('tabs');
             for (var i=0; i<app.addedTabs.length; i++) {
@@ -211,8 +223,9 @@ var app = {
                 app.processEnvUpResponse(envUpResponse);
             }
             else {
-                document.getElementById('log-iframe').contentWindow.document.write("<html><body style='font-family: -apple-system,system-ui,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,sans-serif' font-size: 11pt;'><pre>Error deploying repo. Please try again...</pre></body></html>");
-                console.log('Error deploying repo.');
+				document.getElementById('log-loading').style.display = 'none';
+				document.getElementById('log-error').style.display = 'block';
+				console.log('Error deploying repo.');
             }
         };
         request.open('POST', app.apiUrl + '/api/up', true);

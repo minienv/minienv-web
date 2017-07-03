@@ -103,6 +103,12 @@ body {
 	padding: 10px;
 }
 
+#log-error {
+	color: #1ac5b7;
+	width: 100%;
+	padding: 10px;
+}
+
 #log-iframe {
 	width: 100%;
 	padding: 10px;
