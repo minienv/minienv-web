@@ -132,7 +132,7 @@ var app = {
 		var showEditor = (envUpResponse.editorUrl && envUpResponse.editorUrl.length > 0);
         if (showEditor) {
 			// add nav item for editor
-			var navItem = app.getNavItem("editor", 'Editor');
+			var navItem = app.getNavItem("editor", 'Edit');
 			navItems.appendChild(navItem);
 			app.iframeNavItems['editor-iframe'] = navItem;
 			app.addedNavItems.push(navItem);
