@@ -241,7 +241,7 @@ var app = {
 
     ping: function(callback) {
         var request = new XMLHttpRequest();
-        var json = JSON.stringify({claimToken: app.claimToken, getEnvDetails: ! app.repo});
+        var json = JSON.stringify({claimToken: app.claimToken, getEnvDetails: true});
         request.onload = function() {
             if (this.status >= 200 && this.status < 400) {
                 var pingResponse = JSON.parse(this.responseText);
@@ -256,8 +256,8 @@ var app = {
 						app.claimGranted = true;
                         app.onClaimGrantedChanged();
 					}
-					if (pingResponse.envDetails && ! app.requestedRepo) {
-						app.repo = pingResponse.repo;
+					if (pingResponse.envDetails && ! app.requestedRepo && pingResponse.repo != app.repo) {
+                		app.repo = pingResponse.repo;
 						app.clearAndDisableTabs();
 						app.updateUIRepo(app.repo);
 						app.processEnvUpResponse(pingResponse.envDetails);
