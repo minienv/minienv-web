@@ -126,7 +126,8 @@ var app = {
 
     processEnvUpResponse: function(envUpResponse) {
         document.getElementById('repo-btn').disabled = false;
-		document.getElementById('log-loading').style.display = 'block';
+		document.getElementById('log-loading').textContent = "Your environment is starting...this may take a minute or two...";
+        document.getElementById('log-loading').style.display = 'block';
 		document.getElementById('log-error').style.display = 'none';
 		var navItems = document.getElementById('nav-items');
 		var tabs = document.getElementById('tabs');
@@ -211,7 +212,11 @@ var app = {
 
     up: function() {
         app.clearAndDisableTabs();
-        // make request to server
+        // update status
+		document.getElementById('log-loading').textContent = "Preparing your environment...please wait...";
+		document.getElementById('log-loading').style.display = 'block';
+		document.getElementById('log-error').style.display = 'none';
+		// make request to server
         var request = new XMLHttpRequest();
         var json = JSON.stringify({
             claimToken: app.claimToken,
@@ -247,11 +252,11 @@ var app = {
 					return app.claim(callback);
                 }
                 else {
-					if (!app.claimGranted) {
+                	if (!app.claimGranted) {
 						app.claimGranted = true;
                         app.onClaimGrantedChanged();
 					}
-					if (pingResponse.envDetails) {
+					if (pingResponse.envDetails && ! app.requestedRepo) {
 						app.repo = pingResponse.repo;
 						app.clearAndDisableTabs();
 						app.updateUIRepo(app.repo);
