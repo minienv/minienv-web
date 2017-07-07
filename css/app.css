@@ -44,6 +44,12 @@ body {
 	margin-right: 5px;
 }
 
+#repo-select {
+	width: 640px;
+	max-width: 640px;
+	margin-right: 5px;
+}
+
 #repo-btn {
 	margin-left: 5px;
 }

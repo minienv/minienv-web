@@ -23,7 +23,9 @@
             <div class="tab-pane active" id="main" role="tabpanel">
                 <div id="main-container">
                     <div id="main-repo-container">
-                        <input id="repo-input" class="form-control" aria-label="Enter your repo..." class="input_text" type="text" autocomplete="off" placeholder="Enter your repo..." v-model="repo">
+                        <input id="repo-input" style="display: block;" class="form-control" aria-label="Enter a repo..." class="input_text" type="text" autocomplete="off" placeholder="Enter a repo...">
+                        <select id="repo-select" style="display: none;" class="form-control" aria-label="Select a repo..." placeholder="Select a repo...">
+                        </select>
                         <button id="repo-btn" class="btn btn-secondary" type="submit">Run</button>
                     </div>
                     <div id="main-log-container">

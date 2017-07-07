@@ -4,6 +4,7 @@ var app = {
     claimGranted: false,
     claimToken: null,
     repo: '',
+	whitelistRepos: undefined,
 	requestedRepo: undefined,
 	claimTimeMillis: 5000,
     pingTimeMillis: 15000,
@@ -190,7 +191,7 @@ var app = {
     clearAndDisableTabs: function() {
         document.getElementById('log-iframe').src = 'about:blank';
         document.getElementById('repo-btn').disabled = true;
-		document.getElementById('repo-input').value = app.repo;
+		app.updateUIRepo(app.repo);
 		app.iframeNavItems = {};
 		if (app.addedTabs.length > 0) {
             var tabs = document.getElementById('tabs');
@@ -253,7 +254,7 @@ var app = {
 					if (pingResponse.envDetails) {
 						app.repo = pingResponse.repo;
 						app.clearAndDisableTabs();
-						document.getElementById('repo-input').value = app.repo;
+						app.updateUIRepo(app.repo);
 						app.processEnvUpResponse(pingResponse.envDetails);
 					}
 				}
@@ -292,6 +293,28 @@ var app = {
 		request.open('POST', app.apiUrl + '/api/claim', true);
 		request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
 		request.send(json);
+	},
+
+	loadWhitelist: function(callback) {
+		var request = new XMLHttpRequest();
+		request.onload = function() {
+			if (this.status >= 200 && this.status < 400) {
+				var whitelistResponse = JSON.parse(this.responseText);
+				if (whitelistResponse.repos && whitelistResponse.repos.length > 0) {
+					app.whitelistRepos = whitelistResponse.repos;
+				}
+				else {
+					app.whitelistRepos = undefined;
+				}
+				app.updateUIOnWhitelistChange();
+			}
+			else {
+				console.log('Error getting whitelist.');
+			}
+			callback();
+		};
+		request.open('GET', app.apiUrl + '/api/whitelist', true);
+		request.send();
 	},
 
     getParameterByName: function(name, url) {
@@ -344,7 +367,12 @@ var app = {
             }
         });
         document.getElementById('repo-btn').addEventListener('click', function() {
-            app.repo = document.getElementById('repo-input').value;
+            if (app.whitelistRepos) {
+				app.repo = document.getElementById('repo-select').value;
+			}
+			else {
+				app.repo = document.getElementById('repo-input').value;
+			}
             app.up();
         });
         // periodically ping the server to signal that we are still alive
@@ -357,13 +385,17 @@ var app = {
 			if (typeof(Storage) !== 'undefined') {
 				localStorage.setItem('claimToken', app.claimToken);
 			}
-			// check if repo supplied in url and automatically load
-			if (app.requestedRepo && app.requestedRepo.length > 0) {
-				document.getElementById('repo-input').value = repo;
-				app.repo = app.requestedRepo;
-				app.requestedRepo = undefined;
-				app.up();
-			}
+			app.loadWhitelist(function() {
+				// check if repo supplied in url and automatically load
+				if (app.requestedRepo && app.requestedRepo.length > 0) {
+					if (! app.whitelistRepos || app.whitelistRepos.indexOf(app.requestedRepo) >= 0) {
+						app.repo = app.requestedRepo;
+						app.requestedRepo = undefined;
+						app.updateUIRepo(app.repo);
+						app.up();
+					}
+				}
+			})
         }
         else {
 			app.claimToken = null;
@@ -372,6 +404,38 @@ var app = {
 			}
         }
 		app.updateUIOnClaimGrantedChange();
+	},
+
+	updateUIRepo: function(repo) {
+		if (app.whitelistRepos) {
+			var index = app.whitelistRepos.indexOf(repo);
+			if (index >= 0) {
+				document.getElementById('repo-select').selectedIndex = index;
+			}
+		}
+		else {
+			document.getElementById('repo-input').value = repo;
+		}
+	},
+
+	updateUIOnWhitelistChange: function() {
+		if (app.whitelistRepos) {
+			document.getElementById('repo-input').style.display = 'none';
+			document.getElementById('repo-select').style.display = 'block';
+			var select = document.getElementById("repo-select");
+			for (var i=select.options.length-1; i >= 0; i--) {
+				select.remove(i);
+			}
+			for (var i=0; i<app.whitelistRepos.length; i++) {
+				var option = document.createElement("option");
+				option.text = app.whitelistRepos[i];
+				select.add(option);
+			}
+		}
+		else {
+			document.getElementById('repo-select').style.display = 'none';
+			document.getElementById('repo-input').style.display = 'block';
+		}
 	},
 
     updateUIOnClaimGrantedChange: function() {
