@@ -4,6 +4,7 @@ var app = {
   claimGranted: false,
   claimToken: null,
   repo: '',
+  selectedRepo: '',
   whitelistRepos: undefined,
   requestedRepo: undefined,
   claimTimeMillis: 5000,
@@ -214,7 +215,7 @@ var app = {
     // make request to server
     var request = new XMLHttpRequest();
     var json = JSON.stringify({
-      repo: app.repo
+      repo: app.selectedRepo
     });
     request.onload = function () {
       if (this.status >= 200 && this.status < 400) {
@@ -224,6 +225,7 @@ var app = {
           app.showInfoModal();
         }
         else {
+          app.repo = app.selectedRepo;
           app.up();
         }
       }
@@ -276,6 +278,7 @@ var app = {
     for (var i=0; i<app.env.vars.length; i++) {
       envVars[app.env.vars[i].name] = document.getElementById('nav-env-modal-text' + i).value;
     }
+    app.repo = app.selectedRepo;
     app.up(envVars);
   },
 
@@ -437,16 +440,16 @@ var app = {
     document.getElementById('repo-input').addEventListener('keypress', function (e) {
       if (e.keyCode === 13) {
         e.preventDefault();
-        app.repo = document.getElementById('repo-input').value;
-        app.up();
+        app.selectedRepo = document.getElementById('repo-input').value;
+        app.info();
       }
     });
     document.getElementById('repo-btn').addEventListener('click', function () {
       if (app.whitelistRepos) {
-        app.repo = document.getElementById('repo-select').value;
+        app.selectedRepo = document.getElementById('repo-select').value;
       }
       else {
-        app.repo = document.getElementById('repo-input').value;
+        app.selectedRepo = document.getElementById('repo-input').value;
       }
       app.info();
     });
