@@ -504,9 +504,11 @@ var app = {
       for (var i = select.options.length - 1; i >= 0; i--) {
         select.remove(i);
       }
+      console.log(app.whitelistRepos);
       for (var i = 0; i < app.whitelistRepos.length; i++) {
         var option = document.createElement("option");
-        option.text = app.whitelistRepos[i];
+        option.text = app.whitelistRepos[i].name;
+        option.value = app.whitelistRepos[i].url;
         select.add(option);
       }
     }
