@@ -7,6 +7,7 @@ var app = {
   branch: '',
   selectedRepo: '',
   selectedBranch: '',
+  whitelistReporLoaded: false,
   whitelistRepos: undefined,
   requestedRepo: undefined,
   requestedBranch: undefined,
@@ -373,11 +374,11 @@ var app = {
           app.whitelistRepos = undefined;
         }
         app.updateUIOnWhitelistChange();
+        callback();
       }
       else {
-        console.log('Error getting whitelist.');
+        callback('Error getting whitelist.');
       }
-      callback();
     };
     request.open('GET', app.apiUrl + '/api/whitelist', true);
     request.send();
@@ -452,12 +453,16 @@ var app = {
   },
 
   whitelistReposContains: function(repo, branch) {
+    return app.whitelistReposIndexOf(repo, branch) >= 0;
+  },
+
+  whitelistReposIndexOf: function(repo, branch) {
     for (var i=0; i<app.whitelistRepos.length; i++) {
-        if (app.whitelistRepos[i].url === repo && app.whitelistRepos[i].branch === branch) {
-            return true;
-        }
+      if (app.whitelistRepos[i].url === repo && app.whitelistRepos[i].branch === branch) {
+        return i;
+      }
     }
-    return false;
+    return -1;
   },
 
   onClaimGrantedChanged: function () {
@@ -465,19 +470,17 @@ var app = {
       if (typeof(Storage) !== 'undefined') {
         localStorage.setItem('claimToken', app.claimToken);
       }
-      app.loadWhitelist(function () {
-        // check if repo supplied in url and automatically load
-        if (app.requestedRepo && app.requestedRepo.length > 0) {
-          if (!app.whitelistRepos || app.whitelistReposContains(app.requestedRepo, app.requestedBranch)) {
-            app.repo = app.requestedRepo;
-            app.branch = app.requestedBranch;
-            app.requestedRepo = undefined;
-            app.requestedBranch = undefined;
-            app.updateUIRepo(app.repo, app.branch);
-            app.up();
-          }
+      // check if repo supplied in url and automatically load
+      if (app.requestedRepo && app.requestedRepo.length > 0) {
+        if (!app.whitelistRepos || app.whitelistReposContains(app.requestedRepo, app.requestedBranch)) {
+          app.repo = app.requestedRepo;
+          app.branch = app.requestedBranch;
+          app.requestedRepo = undefined;
+          app.requestedBranch = undefined;
+          app.updateUIRepo(app.repo, app.branch);
+          app.up();
         }
-      })
+      }
     }
     else {
       app.claimToken = null;
@@ -490,7 +493,7 @@ var app = {
 
   updateUIRepo: function(repo, branch) {
     if (app.whitelistRepos) {
-      var index = app.whitelistRepos.indexOf(repo);
+      var index = app.whitelistReposIndexOf(repo, branch);
       if (index >= 0) {
         document.getElementById('repo-select').selectedIndex = index;
       }
@@ -536,6 +539,18 @@ var app = {
   },
 
   onTimer: function () {
+    if (!app.whitelistReposLoaded) {
+      return app.loadWhitelist(function(err) {
+        if (err) {
+          console.log(err);
+          setTimeout(app.onTimer, app.claimTimeMillis);
+        }
+        else {
+          app.whitelistReposLoaded = true;
+          app.onTimer();
+        }
+      });
+    }
     if (!app.claimToken && !app.claimGranted) {
       app.claim(function () {
         setTimeout(app.onTimer, app.claimTimeMillis);
