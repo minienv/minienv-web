@@ -4,9 +4,12 @@ var app = {
   claimGranted: false,
   claimToken: null,
   repo: '',
+  branch: '',
   selectedRepo: '',
+  selectedBranch: '',
   whitelistRepos: undefined,
   requestedRepo: undefined,
+  requestedBranch: undefined,
   claimTimeMillis: 5000,
   pingTimeMillis: 15000,
   pendingIFrameSleepTimeMillis: 100,
@@ -159,26 +162,6 @@ var app = {
       // queue iframe
       app.queueIFrame(document.getElementById(iframeId), envUpResponse.tabs[i].url, app.pendingIFrameSleepTimeMillis);
     }
-    // deploy to bluemix
-    // if (envUpResponse.deployToBluemix) {
-    //     var tabId = 'deploy';
-    //     // add nav item
-    //     navItem = app.getNavItem(tabId,'Deploy');
-    //     navItems.appendChild(navItem);
-    //     app.addedNavItems.push(navItem);
-    //     // add tab
-    //     var img = document.createElement('img');
-    //     img.setAttribute('src', 'https://bluemix.net/deploy/button.png');
-    //     img.setAttribute('alt', 'Deploy to Bluemix');
-    //     var anchor = document.createElement('a');
-    //     anchor.setAttribute('href', 'https://bluemix.net/deploy?repository=' + encodeURIComponent(app.repo));
-    //     anchor.setAttribute('target', '_blank');
-    //     anchor.appendChild(img);
-    //     var tabs = document.getElementById('tabs');
-    //     var tab = app.getTabWithChild(tabId, anchor);
-    //     tabs.appendChild(tab);
-    //     app.addedTabs.push(tab);
-    // }
     // queue log and editor (if enabled)
     app.queueIFrame(document.getElementById('log-iframe'), envUpResponse.logUrl, app.pendingIFrameSleepTimeMillis);
     if (showEditor) {
@@ -193,7 +176,7 @@ var app = {
   clearAndDisableTabs: function () {
     document.getElementById('log-iframe').src = 'about:blank';
     document.getElementById('repo-btn').disabled = true;
-    app.updateUIRepo(app.repo);
+    app.updateUIRepo(app.repo, app.branch);
     app.iframeNavItems = {};
     if (app.addedTabs.length > 0) {
       var tabs = document.getElementById('tabs');
@@ -215,7 +198,8 @@ var app = {
     // make request to server
     var request = new XMLHttpRequest();
     var json = JSON.stringify({
-      repo: app.selectedRepo
+      repo: app.selectedRepo,
+      branch: app.selectedBranch
     });
     request.onload = function () {
       if (this.status >= 200 && this.status < 400) {
@@ -226,6 +210,7 @@ var app = {
         }
         else {
           app.repo = app.selectedRepo;
+          app.branch = app.selectedBranch;
           app.up();
         }
       }
@@ -279,6 +264,7 @@ var app = {
       envVars[app.env.vars[i].name] = document.getElementById('nav-env-modal-text' + i).value;
     }
     app.repo = app.selectedRepo;
+    app.branch = app.selectedBranch;
     app.up(envVars);
   },
 
@@ -293,6 +279,7 @@ var app = {
     var json = JSON.stringify({
       claimToken: app.claimToken,
       repo: app.repo,
+      branch: app.branch,
       envVars: envVars
     });
     request.onload = function () {
@@ -329,10 +316,11 @@ var app = {
             app.claimGranted = true;
             app.onClaimGrantedChanged();
           }
-          if (pingResponse.envDetails && !app.requestedRepo && pingResponse.repo != app.repo) {
+          if (pingResponse.envDetails && !app.requestedRepo && pingResponse.repo != app.repo && pingResponse.branch != app.branch) {
             app.repo = pingResponse.repo;
+            app.branch = pingResponse.branch;
             app.clearAndDisableTabs();
-            app.updateUIRepo(app.repo);
+            app.updateUIRepo(app.repo, app.branch);
             app.processEnvUpResponse(pingResponse.envDetails);
           }
         }
@@ -428,6 +416,7 @@ var app = {
     }
     // get repo from query string
     app.requestedRepo = app.getParameterByName('repo');
+    app.requestedBranch = app.getParameterByName('branch');
     // get claimToken
     var claimToken = app.getParameterByName('token');
     if (claimToken && claimToken.length > 0) {
@@ -441,21 +430,34 @@ var app = {
       if (e.keyCode === 13) {
         e.preventDefault();
         app.selectedRepo = document.getElementById('repo-input').value;
+        app.selectedBranch = '';
         app.info();
       }
     });
     document.getElementById('repo-btn').addEventListener('click', function () {
       if (app.whitelistRepos) {
-        app.selectedRepo = document.getElementById('repo-select').value;
+        var whitelistRepo = app.whitelistRepos[parseInt(document.getElementById('repo-select').value)];
+        app.selectedRepo = whitelistRepo.url;
+        app.selectedBranch = whitelistRepo.branch;
       }
       else {
         app.selectedRepo = document.getElementById('repo-input').value;
+        app.selectedBranch = '';
       }
       app.info();
     });
     // periodically ping the server to signal that we are still alive
     // server will tear down any pods for users not actively running
     app.onTimer();
+  },
+
+  whitelistReposContains: function(repo, branch) {
+    for (var i=0; i<app.whitelistRepos.length; i++) {
+        if (app.whitelistRepos[i].url === repo && app.whitelistRepos[i].branch === branch) {
+            return true;
+        }
+    }
+    return false;
   },
 
   onClaimGrantedChanged: function () {
@@ -466,10 +468,12 @@ var app = {
       app.loadWhitelist(function () {
         // check if repo supplied in url and automatically load
         if (app.requestedRepo && app.requestedRepo.length > 0) {
-          if (!app.whitelistRepos || app.whitelistRepos.indexOf(app.requestedRepo) >= 0) {
+          if (!app.whitelistRepos || app.whitelistReposContains(app.requestedRepo, app.requestedBranch)) {
             app.repo = app.requestedRepo;
+            app.branch = app.requestedBranch;
             app.requestedRepo = undefined;
-            app.updateUIRepo(app.repo);
+            app.requestedBranch = undefined;
+            app.updateUIRepo(app.repo, app.branch);
             app.up();
           }
         }
@@ -484,7 +488,7 @@ var app = {
     app.updateUIOnClaimGrantedChange();
   },
 
-  updateUIRepo: function (repo) {
+  updateUIRepo: function(repo, branch) {
     if (app.whitelistRepos) {
       var index = app.whitelistRepos.indexOf(repo);
       if (index >= 0) {
@@ -508,7 +512,7 @@ var app = {
       for (var i = 0; i < app.whitelistRepos.length; i++) {
         var option = document.createElement("option");
         option.text = app.whitelistRepos[i].name;
-        option.value = app.whitelistRepos[i].url;
+        option.value = i+"";
         select.add(option);
       }
     }
