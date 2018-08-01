@@ -1,6 +1,9 @@
 var app = {
 
+  me: null,
+  accessToken: null,
   apiUrl: '$apiUrl',
+  githubClientId: '$githubClientId',
   claimGranted: false,
   claimToken: null,
   repo: '',
@@ -38,7 +41,6 @@ var app = {
     else {
       app.pendingIFrameTimer = null;
     }
-
   },
 
   loadIFrame: function (iframe, src) {
@@ -71,6 +73,7 @@ var app = {
       }
     };
     request.open('GET', src, true);
+    //request.setRequestHeader('X-Access-Token', app.accessToken);
     request.send();
   },
 
@@ -221,6 +224,7 @@ var app = {
       }
     };
     request.open('POST', app.apiUrl + '/api/info', true);
+    request.setRequestHeader('X-Access-Token', app.accessToken);
     request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     request.send(json);
   },
@@ -269,6 +273,22 @@ var app = {
     app.up(envVars);
   },
 
+  getMe: function(callback) {
+    var request = new XMLHttpRequest();
+    request.onload = function () {
+      if (this.status >= 200 && this.status < 400) {
+        app.me = JSON.parse(this.responseText);
+        callback();
+      }
+      else {
+        callback('Error getting me.');
+      }
+    };
+    request.open('GET', app.apiUrl + '/api/me', true);
+    request.setRequestHeader('X-Access-Token', app.accessToken);
+    request.send();
+  },
+
   up: function (envVars) {
     app.clearAndDisableTabs();
     // update status
@@ -296,6 +316,7 @@ var app = {
       }
     };
     request.open('POST', app.apiUrl + '/api/up', true);
+    request.setRequestHeader('X-Access-Token', app.accessToken);
     request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     request.send(json);
   },
@@ -332,6 +353,7 @@ var app = {
       callback();
     };
     request.open('POST', app.apiUrl + '/api/ping', true);
+    request.setRequestHeader('X-Access-Token', app.accessToken);
     request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     request.send(json);
   },
@@ -358,6 +380,7 @@ var app = {
       callback();
     };
     request.open('POST', app.apiUrl + '/api/claim', true);
+    request.setRequestHeader('X-Access-Token', app.accessToken);
     request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     request.send(json);
   },
@@ -381,6 +404,7 @@ var app = {
       }
     };
     request.open('GET', app.apiUrl + '/api/whitelist', true);
+    request.setRequestHeader('X-Access-Token', app.accessToken);
     request.send();
   },
 
@@ -407,13 +431,31 @@ var app = {
     };
     // fix api url
     if (app.apiUrl.startsWith('$')) {
-      api = app.getParameterByName('api');
+      var api = app.getParameterByName('api');
       if (api) {
         app.apiUrl = api;
       }
       else {
-        app.apiUrl = 'http://localhost:8080';
+        app.apiUrl = 'http://localhost:8002';
       }
+    }
+    // fix github client id
+    if (app.githubClientId.startsWith('$')) {
+      var clientId = app.getParameterByName('clientId');
+      if (clientId) {
+        app.githubClientId = clientId;
+      }
+      else {
+        app.githubClientId = '02d75fcd9044ca3d6cf9';
+      }
+    }
+    // get token
+    app.accessToken = app.getParameterByName('at');
+    if (!app.accessToken && typeof(Storage) !== 'undefined') {
+      app.accessToken = localStorage.getItem('accessToken');
+    }
+    else if (!!app.accessToken && typeof(Storage) !== 'undefined') {
+      localStorage.setItem('accessToken', app.accessToken);
     }
     // get repo from query string
     app.requestedRepo = app.getParameterByName('repo');
@@ -539,6 +581,26 @@ var app = {
   },
 
   onTimer: function () {
+    if (! app.me) {
+      return app.getMe(function(err) {
+        if (err) {
+          var redirectUrl = document.location.href;
+          if (redirectUrl.indexOf("?") >= 0) {
+            redirectUrl += "&";
+          }
+          else {
+            redirectUrl += "?";
+          }
+          redirectUrl += "at=$accessToken";
+          var url = 'https://github.com/login/oauth/authorize?scope=user:email,read:org,repo,&client_id=' + app.githubClientId;
+          url += '&state=' + encodeURIComponent(redirectUrl);
+          document.location.href = url;
+        }
+        else {
+          app.onTimer();
+        }
+      });
+    }
     if (!app.whitelistReposLoaded) {
       return app.loadWhitelist(function(err) {
         if (err) {
