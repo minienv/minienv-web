@@ -450,12 +450,8 @@ var app = {
       }
     }
     // get token
-    app.accessToken = app.getParameterByName('at');
-    if (!app.accessToken && typeof(Storage) !== 'undefined') {
-      app.accessToken = localStorage.getItem('accessToken');
-    }
-    else if (!!app.accessToken && typeof(Storage) !== 'undefined') {
-      localStorage.setItem('accessToken', app.accessToken);
+    if (typeof(Storage) !== 'undefined') {
+      app.accessToken = localStorage.getItem('githubAccessToken');
     }
     // get repo from query string
     app.requestedRepo = app.getParameterByName('repo');
@@ -584,16 +580,15 @@ var app = {
     if (! app.me) {
       return app.getMe(function(err) {
         if (err) {
-          var redirectUrl = document.location.href;
-          if (redirectUrl.indexOf("?") >= 0) {
-            redirectUrl += "&";
+          var state = "1234567890"; // TODO:generate unique key here
+          var url = 'https://github.com/login/oauth/authorize?scope=user:email,read:org,repo,&client_id=';
+          url += encodeURIComponent(app.githubClientId);
+          url += "&state=";
+          url += encodeURIComponent(state);
+          if (typeof(Storage) !== 'undefined') {
+            localStorage.setItem('githubAuthRedirectUrl', document.location.href);
+            localStorage.setItem('githubAuthState', state);
           }
-          else {
-            redirectUrl += "?";
-          }
-          redirectUrl += "at=$accessToken";
-          var url = 'https://github.com/login/oauth/authorize?scope=user:email,read:org,repo,&client_id=' + app.githubClientId;
-          url += '&state=' + encodeURIComponent(redirectUrl);
           document.location.href = url;
         }
         else {
