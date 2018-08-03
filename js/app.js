@@ -218,7 +218,7 @@ var app = {
         console.log('ERROR');
       }
     };
-    request.open('POST', consts.apiUrl + '/api/info', true);
+    request.open('POST', consts.apiUrl + '/info', true);
     request.setRequestHeader('X-Access-Token', app.accessToken);
     request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     request.send(json);
@@ -268,7 +268,7 @@ var app = {
         callback('Error getting me.');
       }
     };
-    request.open('GET', consts.apiUrl + '/api/me', true);
+    request.open('GET', consts.apiUrl + '/me', true);
     request.setRequestHeader('X-Access-Token', app.accessToken);
     request.send();
   },
@@ -310,7 +310,7 @@ var app = {
         console.log('Error deploying repo.');
       }
     };
-    request.open('POST', consts.apiUrl + '/api/up', true);
+    request.open('POST', consts.apiUrl + '/up', true);
     request.setRequestHeader('X-Access-Token', app.accessToken);
     request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     request.send(json);
@@ -347,7 +347,7 @@ var app = {
       }
       callback();
     };
-    request.open('POST', consts.apiUrl + '/api/ping', true);
+    request.open('POST', consts.apiUrl + '/ping', true);
     request.setRequestHeader('X-Access-Token', app.accessToken);
     request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     request.send(json);
@@ -355,7 +355,6 @@ var app = {
 
   claim: function (callback) {
     var request = new XMLHttpRequest();
-    var json = JSON.stringify({authorization: 'TODO'});
     request.onload = function () {
       if (this.status >= 200 && this.status < 400) {
         var claimResponse = JSON.parse(this.responseText);
@@ -374,10 +373,10 @@ var app = {
       }
       callback();
     };
-    request.open('POST', consts.apiUrl + '/api/claim', true);
+    request.open('POST', consts.apiUrl + '/claim', true);
     request.setRequestHeader('X-Access-Token', app.accessToken);
     request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
-    request.send(json);
+    request.send('{}');
   },
 
   init: function () {

@@ -41,7 +41,7 @@ var whitelist = {
     request.onload = function () {
       if (this.status >= 200 && this.status < 400) {
         var whitelistResponse = JSON.parse(this.responseText);
-        if (whitelistResponse) {
+        if (whitelistResponse && whitelistResponse.repos && whitelistResponse.repos.length > 0) {
           whitelist.repos = new WhitelistReposWrapper(whitelistResponse.repos);
         }
         whitelist.loaded = true;
@@ -51,7 +51,7 @@ var whitelist = {
         callback('Error getting whitelist.');
       }
     };
-    request.open('GET', consts.apiUrl + '/api/whitelist', true);
+    request.open('GET', consts.apiUrl + '/whitelist', true);
     request.setRequestHeader('X-Access-Token', accessToken);
     request.send();
   }
