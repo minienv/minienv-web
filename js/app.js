@@ -2,16 +2,12 @@ var app = {
 
   me: null,
   accessToken: null,
-  apiUrl: '$apiUrl',
-  githubClientId: '$githubClientId',
   claimGranted: false,
   claimToken: null,
   repo: '',
   branch: '',
   selectedRepo: '',
   selectedBranch: '',
-  whitelistReporLoaded: false,
-  whitelistRepos: undefined,
   requestedRepo: undefined,
   requestedBranch: undefined,
   claimTimeMillis: 5000,
@@ -199,7 +195,6 @@ var app = {
   },
 
   info: function () {
-    // make request to server
     var request = new XMLHttpRequest();
     var json = JSON.stringify({
       repo: app.selectedRepo,
@@ -223,7 +218,7 @@ var app = {
         console.log('ERROR');
       }
     };
-    request.open('POST', app.apiUrl + '/api/info', true);
+    request.open('POST', consts.apiUrl + '/api/info', true);
     request.setRequestHeader('X-Access-Token', app.accessToken);
     request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     request.send(json);
@@ -262,17 +257,6 @@ var app = {
     $("#nav-env-modal").modal();
   },
 
-  upWithEnvVars() {
-    $('#nav-env-modal').modal('hide');
-    var envVars = {};
-    for (var i=0; i<app.env.vars.length; i++) {
-      envVars[app.env.vars[i].name] = document.getElementById('nav-env-modal-text' + i).value;
-    }
-    app.repo = app.selectedRepo;
-    app.branch = app.selectedBranch;
-    app.up(envVars);
-  },
-
   getMe: function(callback) {
     var request = new XMLHttpRequest();
     request.onload = function () {
@@ -284,9 +268,20 @@ var app = {
         callback('Error getting me.');
       }
     };
-    request.open('GET', app.apiUrl + '/api/me', true);
+    request.open('GET', consts.apiUrl + '/api/me', true);
     request.setRequestHeader('X-Access-Token', app.accessToken);
     request.send();
+  },
+
+  upWithEnvVars() {
+    $('#nav-env-modal').modal('hide');
+    var envVars = {};
+    for (var i=0; i<app.env.vars.length; i++) {
+      envVars[app.env.vars[i].name] = document.getElementById('nav-env-modal-text' + i).value;
+    }
+    app.repo = app.selectedRepo;
+    app.branch = app.selectedBranch;
+    app.up(envVars);
   },
 
   up: function (envVars) {
@@ -315,7 +310,7 @@ var app = {
         console.log('Error deploying repo.');
       }
     };
-    request.open('POST', app.apiUrl + '/api/up', true);
+    request.open('POST', consts.apiUrl + '/api/up', true);
     request.setRequestHeader('X-Access-Token', app.accessToken);
     request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     request.send(json);
@@ -352,7 +347,7 @@ var app = {
       }
       callback();
     };
-    request.open('POST', app.apiUrl + '/api/ping', true);
+    request.open('POST', consts.apiUrl + '/api/ping', true);
     request.setRequestHeader('X-Access-Token', app.accessToken);
     request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     request.send(json);
@@ -379,49 +374,10 @@ var app = {
       }
       callback();
     };
-    request.open('POST', app.apiUrl + '/api/claim', true);
+    request.open('POST', consts.apiUrl + '/api/claim', true);
     request.setRequestHeader('X-Access-Token', app.accessToken);
     request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     request.send(json);
-  },
-
-  loadWhitelist: function (callback) {
-    var request = new XMLHttpRequest();
-    request.onload = function () {
-      if (this.status >= 200 && this.status < 400) {
-        var whitelistResponse = JSON.parse(this.responseText);
-        if (whitelistResponse.repos && whitelistResponse.repos.length > 0) {
-          app.whitelistRepos = whitelistResponse.repos;
-        }
-        else {
-          app.whitelistRepos = undefined;
-        }
-        app.updateUIOnWhitelistChange();
-        callback();
-      }
-      else {
-        callback('Error getting whitelist.');
-      }
-    };
-    request.open('GET', app.apiUrl + '/api/whitelist', true);
-    request.setRequestHeader('X-Access-Token', app.accessToken);
-    request.send();
-  },
-
-  getParameterByName: function (name, url) {
-    if (!url) {
-      url = window.location.href;
-    }
-    name = name.replace(/[\[\]]/g, "\\$&");
-    var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)");
-    var results = regex.exec(url);
-    if (!results) {
-      return null;
-    }
-    if (!results[2]) {
-      return '';
-    }
-    return decodeURIComponent(results[2].replace(/\+/g, " "));
   },
 
   init: function () {
@@ -429,41 +385,10 @@ var app = {
     window.onbeforeunload = function () {
       return true;
     };
-    // fix api url
-    if (app.apiUrl.startsWith('$')) {
-      var api = app.getParameterByName('api');
-      if (api) {
-        app.apiUrl = api;
-      }
-      else {
-        app.apiUrl = 'http://localhost:8002';
-      }
-    }
-    // fix github client id
-    if (app.githubClientId.startsWith('$')) {
-      var clientId = app.getParameterByName('clientId');
-      if (clientId) {
-        app.githubClientId = clientId;
-      }
-      else {
-        app.githubClientId = '02d75fcd9044ca3d6cf9';
-      }
-    }
-    // get token
-    if (typeof(Storage) !== 'undefined') {
-      app.accessToken = localStorage.getItem('githubAccessToken');
-    }
-    // get repo from query string
-    app.requestedRepo = app.getParameterByName('repo');
-    app.requestedBranch = app.getParameterByName('branch');
-    // get claimToken
-    var claimToken = app.getParameterByName('token');
-    if (claimToken && claimToken.length > 0) {
-      app.claimToken = claimToken;
-    }
-    if (!app.claimToken && typeof(Storage) !== 'undefined') {
-      app.claimToken = localStorage.getItem('claimToken');
-    }
+    app.accessToken = utils.getFromLocalStorage('githubAccessToken');
+    app.requestedRepo = utils.getParameterByName('repo');
+    app.requestedBranch = utils.getParameterByName('branch');
+    app.claimToken = utils.getParameterByName('token') || utils.getFromLocalStorage('claimToken');
     // wire up events
     document.getElementById('repo-input').addEventListener('keypress', function (e) {
       if (e.keyCode === 13) {
@@ -474,8 +399,8 @@ var app = {
       }
     });
     document.getElementById('repo-btn').addEventListener('click', function () {
-      if (app.whitelistRepos) {
-        var whitelistRepo = app.whitelistRepos[parseInt(document.getElementById('repo-select').value)];
+      if (whitelist.repos) {
+        var whitelistRepo = whitelist.repos.get(parseInt(document.getElementById('repo-select').value));
         app.selectedRepo = whitelistRepo.url;
         app.selectedBranch = whitelistRepo.branch;
       }
@@ -490,27 +415,12 @@ var app = {
     app.onTimer();
   },
 
-  whitelistReposContains: function(repo, branch) {
-    return app.whitelistReposIndexOf(repo, branch) >= 0;
-  },
-
-  whitelistReposIndexOf: function(repo, branch) {
-    for (var i=0; i<app.whitelistRepos.length; i++) {
-      if (app.whitelistRepos[i].url === repo && app.whitelistRepos[i].branch === branch) {
-        return i;
-      }
-    }
-    return -1;
-  },
-
   onClaimGrantedChanged: function () {
     if (app.claimGranted) {
-      if (typeof(Storage) !== 'undefined') {
-        localStorage.setItem('claimToken', app.claimToken);
-      }
+      utils.saveToLocalStorage('claimToken', app.claimToken);
       // check if repo supplied in url and automatically load
       if (app.requestedRepo && app.requestedRepo.length > 0) {
-        if (!app.whitelistRepos || app.whitelistReposContains(app.requestedRepo, app.requestedBranch)) {
+        if (!whitelist.repos || whitelist.repos.contains(app.requestedRepo, app.requestedBranch)) {
           app.repo = app.requestedRepo;
           app.branch = app.requestedBranch;
           app.requestedRepo = undefined;
@@ -522,16 +432,14 @@ var app = {
     }
     else {
       app.claimToken = null;
-      if (typeof(Storage) !== 'undefined') {
-        localStorage.removeItem('claimToken');
-      }
+      utils.removeFromLocalStorage('claimToken');
     }
     app.updateUIOnClaimGrantedChange();
   },
 
   updateUIRepo: function(repo, branch) {
-    if (app.whitelistRepos) {
-      var index = app.whitelistReposIndexOf(repo, branch);
+    if (whitelist.repos) {
+      var index = whitelist.repos.indexOf(repo, branch);
       if (index >= 0) {
         document.getElementById('repo-select').selectedIndex = index;
       }
@@ -542,20 +450,19 @@ var app = {
   },
 
   updateUIOnWhitelistChange: function () {
-    if (app.whitelistRepos) {
+    if (whitelist.repos) {
       document.getElementById('repo-input').style.display = 'none';
       document.getElementById('repo-select').style.display = 'block';
       var select = document.getElementById("repo-select");
       for (var i = select.options.length - 1; i >= 0; i--) {
-        select.remove(i);
+        select.options.remove(i);
       }
-      console.log(app.whitelistRepos);
-      for (var i = 0; i < app.whitelistRepos.length; i++) {
+      whitelist.repos.forEach(function(repo, i) {
         var option = document.createElement("option");
-        option.text = app.whitelistRepos[i].name;
+        option.text = repo.name;
         option.value = i+"";
         select.add(option);
-      }
+      });
     }
     else {
       document.getElementById('repo-select').style.display = 'none';
@@ -580,15 +487,13 @@ var app = {
     if (! app.me) {
       return app.getMe(function(err) {
         if (err) {
-          var state = "1234567890"; // TODO:generate unique key here
+          var state = Math.random().toString(36).substring(2); // random string
           var url = 'https://github.com/login/oauth/authorize?scope=user:email,read:org,repo,&client_id=';
-          url += encodeURIComponent(app.githubClientId);
+          url += encodeURIComponent(consts.githubClientId);
           url += "&state=";
           url += encodeURIComponent(state);
-          if (typeof(Storage) !== 'undefined') {
-            localStorage.setItem('githubAuthRedirectUrl', document.location.href);
-            localStorage.setItem('githubAuthState', state);
-          }
+          utils.saveToLocalStorage('githubAuthRedirectUrl', document.location.href);
+          utils.saveToLocalStorage('githubAuthState', state);
           document.location.href = url;
         }
         else {
@@ -596,14 +501,15 @@ var app = {
         }
       });
     }
-    if (!app.whitelistReposLoaded) {
-      return app.loadWhitelist(function(err) {
+    if (!whitelist.loaded) {
+      return whitelist.load(app.accessToken, function(err) {
         if (err) {
+          // mw:TODO
           console.log(err);
           setTimeout(app.onTimer, app.claimTimeMillis);
         }
         else {
-          app.whitelistReposLoaded = true;
+          app.updateUIOnWhitelistChange();
           app.onTimer();
         }
       });
