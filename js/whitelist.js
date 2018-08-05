@@ -36,7 +36,7 @@ var whitelist = {
   loaded: false,
   repos: undefined,
 
-  load: function (accessToken, callback) {
+  load: function (sessionId, callback) {
     var request = new XMLHttpRequest();
     request.onload = function () {
       if (this.status >= 200 && this.status < 400) {
@@ -52,7 +52,7 @@ var whitelist = {
       }
     };
     request.open('GET', consts.apiUrl + '/whitelist', true);
-    request.setRequestHeader('X-Access-Token', accessToken);
+    request.setRequestHeader('Minienv-Session-Id', sessionId);
     request.send();
   }
 };

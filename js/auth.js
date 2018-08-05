@@ -7,8 +7,8 @@ var app = {
     var request = new XMLHttpRequest();
     request.onload = function () {
       if (this.status >= 200 && this.status < 400) {
-        var me = JSON.parse(this.responseText);
-        utils.saveToLocalStorage('githubAccessToken', me.user.accessToken);
+        //var me = JSON.parse(this.responseText);
+        //utils.saveToLocalStorage('githubAccessToken', me.user.accessToken);
         callback();
       }
       else {
@@ -16,13 +16,14 @@ var app = {
       }
     };
     request.open('GET', consts.apiUrl + '/auth/callback?code=' + encodeURIComponent(app.code), true);
+    request.setRequestHeader('Minienv-Session-Id', utils.getFromLocalStorage('sessionId'));
     request.send();
   },
 
   init: function () {
     // get code
-    let redirectUrl = utils.getFromLocalStorage('githubAuthRedirectUrl') || '/error/browser';
-    let state = utils.getFromLocalStorage('githubAuthState');;
+    var redirectUrl = utils.getFromLocalStorage('githubAuthRedirectUrl') || '/error/browser';
+    var state = utils.getFromLocalStorage('githubAuthState');;
     utils.removeFromLocalStorage('githubAuthRedirectUrl');
     utils.removeFromLocalStorage('githubAuthState');
     app.code = utils.getParameterByName('code');

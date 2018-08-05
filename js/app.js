@@ -1,7 +1,7 @@
 var app = {
 
   me: null,
-  accessToken: null,
+  sessionId: null,
   claimGranted: false,
   claimToken: null,
   repo: '',
@@ -69,7 +69,6 @@ var app = {
       }
     };
     request.open('GET', src, true);
-    //request.setRequestHeader('X-Access-Token', app.accessToken);
     request.send();
   },
 
@@ -219,7 +218,7 @@ var app = {
       }
     };
     request.open('POST', consts.apiUrl + '/info', true);
-    request.setRequestHeader('X-Access-Token', app.accessToken);
+    request.setRequestHeader('Minienv-Session-Id', app.sessionId);
     request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     request.send(json);
   },
@@ -262,6 +261,8 @@ var app = {
     request.onload = function () {
       if (this.status >= 200 && this.status < 400) {
         app.me = JSON.parse(this.responseText);
+        app.sessionId = app.me.sessionId;
+        utils.saveToLocalStorage('sessionId', app.sessionId);
         callback();
       }
       else {
@@ -269,7 +270,7 @@ var app = {
       }
     };
     request.open('GET', consts.apiUrl + '/me', true);
-    request.setRequestHeader('X-Access-Token', app.accessToken);
+    request.setRequestHeader('Minienv-Session-Id', app.sessionId);
     request.send();
   },
 
@@ -311,7 +312,7 @@ var app = {
       }
     };
     request.open('POST', consts.apiUrl + '/up', true);
-    request.setRequestHeader('X-Access-Token', app.accessToken);
+    request.setRequestHeader('Minienv-Session-Id', app.sessionId);
     request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     request.send(json);
   },
@@ -348,7 +349,7 @@ var app = {
       callback();
     };
     request.open('POST', consts.apiUrl + '/ping', true);
-    request.setRequestHeader('X-Access-Token', app.accessToken);
+    request.setRequestHeader('Minienv-Session-Id', app.sessionId);
     request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     request.send(json);
   },
@@ -374,44 +375,9 @@ var app = {
       callback();
     };
     request.open('POST', consts.apiUrl + '/claim', true);
-    request.setRequestHeader('X-Access-Token', app.accessToken);
+    request.setRequestHeader('Minienv-Session-Id', app.sessionId);
     request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     request.send('{}');
-  },
-
-  init: function () {
-    // warn when leaving
-    window.onbeforeunload = function () {
-      return true;
-    };
-    app.accessToken = utils.getFromLocalStorage('githubAccessToken');
-    app.requestedRepo = utils.getParameterByName('repo');
-    app.requestedBranch = utils.getParameterByName('branch');
-    app.claimToken = utils.getParameterByName('token') || utils.getFromLocalStorage('claimToken');
-    // wire up events
-    document.getElementById('repo-input').addEventListener('keypress', function (e) {
-      if (e.keyCode === 13) {
-        e.preventDefault();
-        app.selectedRepo = document.getElementById('repo-input').value;
-        app.selectedBranch = '';
-        app.info();
-      }
-    });
-    document.getElementById('repo-btn').addEventListener('click', function () {
-      if (whitelist.repos) {
-        var whitelistRepo = whitelist.repos.get(parseInt(document.getElementById('repo-select').value));
-        app.selectedRepo = whitelistRepo.url;
-        app.selectedBranch = whitelistRepo.branch;
-      }
-      else {
-        app.selectedRepo = document.getElementById('repo-input').value;
-        app.selectedBranch = '';
-      }
-      app.info();
-    });
-    // periodically ping the server to signal that we are still alive
-    // server will tear down any pods for users not actively running
-    app.onTimer();
   },
 
   onClaimGrantedChanged: function () {
@@ -482,10 +448,45 @@ var app = {
     }
   },
 
+  init: function () {
+    // warn when leaving
+    window.onbeforeunload = function () {
+      return true;
+    };
+    app.sessionId = utils.getFromLocalStorage('sessionId');
+    app.requestedRepo = utils.getParameterByName('repo');
+    app.requestedBranch = utils.getParameterByName('branch');
+    app.claimToken = utils.getParameterByName('token') || utils.getFromLocalStorage('claimToken');
+    // wire up events
+    document.getElementById('repo-input').addEventListener('keypress', function (e) {
+      if (e.keyCode === 13) {
+        e.preventDefault();
+        app.selectedRepo = document.getElementById('repo-input').value;
+        app.selectedBranch = '';
+        app.info();
+      }
+    });
+    document.getElementById('repo-btn').addEventListener('click', function () {
+      if (whitelist.repos) {
+        var whitelistRepo = whitelist.repos.get(parseInt(document.getElementById('repo-select').value));
+        app.selectedRepo = whitelistRepo.url;
+        app.selectedBranch = whitelistRepo.branch;
+      }
+      else {
+        app.selectedRepo = document.getElementById('repo-input').value;
+        app.selectedBranch = '';
+      }
+      app.info();
+    });
+    // periodically ping the server to signal that we are still alive
+    // server will tear down any pods for users not actively running
+    app.onTimer();
+  },
+
   onTimer: function () {
     if (! app.me) {
       return app.getMe(function(err) {
-        if (err) {
+        if (! err && ! app.me.authenticated) {
           var state = Math.random().toString(36).substring(2); // random string
           var url = 'https://github.com/login/oauth/authorize?scope=user:email,read:org,repo,&client_id=';
           url += encodeURIComponent(consts.githubClientId);
@@ -501,7 +502,7 @@ var app = {
       });
     }
     if (!whitelist.loaded) {
-      return whitelist.load(app.accessToken, function(err) {
+      return whitelist.load(app.sessionId, function(err) {
         if (err) {
           // mw:TODO
           console.log(err);
