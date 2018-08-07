@@ -410,7 +410,11 @@ var app = {
       }
     }
     else {
-      document.getElementById('repo-input').value = repo;
+      var value = repo;
+      if (branch && branch.length > 0) {
+        value += "#" + branch;
+      }
+      document.getElementById('repo-input').value = value;
     }
   },
 
@@ -461,8 +465,10 @@ var app = {
     document.getElementById('repo-input').addEventListener('keypress', function (e) {
       if (e.keyCode === 13) {
         e.preventDefault();
-        app.selectedRepo = document.getElementById('repo-input').value;
-        app.selectedBranch = '';
+        var value = document.getElementById('repo-input').value;
+        var values = value.split('#');
+        app.selectedRepo = values[0];
+        app.selectedBranch = values.length > 1 ? values[1] : '';
         app.info();
       }
     });
@@ -473,8 +479,10 @@ var app = {
         app.selectedBranch = whitelistRepo.branch;
       }
       else {
-        app.selectedRepo = document.getElementById('repo-input').value;
-        app.selectedBranch = '';
+        var value = document.getElementById('repo-input').value;
+        var values = value.split('#');
+        app.selectedRepo = values[0];
+        app.selectedBranch = values.length > 1 ? values[1] : '';
       }
       app.info();
     });
