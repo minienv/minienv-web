@@ -1,7 +1,6 @@
 var consts = {
 
-  apiUrl: '$apiUrl',
-  githubClientId: '$githubClientId',
+  apiUrl: '$apiUrl'
 
   init: function () {
     // fix api url
@@ -12,16 +11,6 @@ var consts = {
       }
       else {
         consts.apiUrl = 'http://localhost:8002';
-      }
-    }
-    // fix github client id
-    if (consts.githubClientId.startsWith('$')) {
-      var clientId = utils.getParameterByName('clientId');
-      if (clientId) {
-        consts.githubClientId = clientId;
-      }
-      else {
-        consts.githubClientId = '02d75fcd9044ca3d6cf9';
       }
     }
   }

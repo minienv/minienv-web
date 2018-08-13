@@ -494,19 +494,7 @@ var app = {
   onTimer: function () {
     if (! app.me) {
       return app.getMe(function(err) {
-        if (! err && ! app.me.authenticated) {
-          var state = Math.random().toString(36).substring(2); // random string
-          var url = 'https://github.com/login/oauth/authorize?scope=user:email,read:org,repo,&client_id=';
-          url += encodeURIComponent(consts.githubClientId);
-          url += "&state=";
-          url += encodeURIComponent(state);
-          utils.saveToLocalStorage('githubAuthRedirectUrl', document.location.href);
-          utils.saveToLocalStorage('githubAuthState', state);
-          document.location.href = url;
-        }
-        else {
           app.onTimer();
-        }
       });
     }
     if (!whitelist.loaded) {
