@@ -202,15 +202,9 @@ var app = {
     request.onload = function () {
       if (this.status >= 200 && this.status < 400) {
         var infoResponse = JSON.parse(this.responseText);
-        if (infoResponse && infoResponse.env && infoResponse.env.vars && infoResponse.env.vars.length > 0) {
-          app.env = infoResponse.env;
-          app.showInfoModal();
-        }
-        else {
-          app.repo = app.selectedRepo;
-          app.branch = app.selectedBranch;
-          app.up();
-        }
+        app.repo = app.selectedRepo;
+        app.branch = app.selectedBranch;
+        app.up();
       }
       else {
         // mw:TODO:
@@ -221,39 +215,6 @@ var app = {
     request.setRequestHeader('Minienv-Session-Id', app.sessionId);
     request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     request.send(json);
-  },
-
-  showInfoModal : function() {
-    var html = '';
-    html += '<div id="nav-env-modal" class="modal fade">';
-    html += '<div class="modal-dialog" role="document">';
-    html += '<div class="modal-content">';
-    html += '<div class="modal-header">';
-    html += '<h5 class="modal-title">Set Environment Variables</h5>';
-    html += '<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>';
-    html += '</div>';
-    html += '<div class="modal-body">';
-    html += '<form id="nav-env-modal-form">';
-    for (var i=0; i<app.env.vars.length; i++) {
-      html += '<div class="form-group">';
-      html += '<label for="example-text-input" class="col-2 col-form-label">' + app.env.vars[i].name + '</label>';
-      html += '</div">';
-      html += '<div class="form-group">';
-      html += '<input class="form-control" type="text" value="' + app.env.vars[i].defaultValue + '" id="nav-env-modal-text' + i + '">';
-      html += '</div>';
-      html += '</div>';
-    }
-    html += '</form>';
-    html += '</div>';
-    html += '<div class="modal-footer">';
-    html += '<button type="button" class="btn btn-primary" onclick="app.upWithEnvVars();">Run</button>';
-    html += '<button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>';
-    html += '</div>';
-    html += '</div>';
-    html += '</div>';
-    html += '</div>';
-    document.getElementById('nav-env-modal-container').innerHTML = html;
-    $("#nav-env-modal").modal();
   },
 
   getMe: function(callback) {
@@ -274,18 +235,7 @@ var app = {
     request.send();
   },
 
-  upWithEnvVars() {
-    $('#nav-env-modal').modal('hide');
-    var envVars = {};
-    for (var i=0; i<app.env.vars.length; i++) {
-      envVars[app.env.vars[i].name] = document.getElementById('nav-env-modal-text' + i).value;
-    }
-    app.repo = app.selectedRepo;
-    app.branch = app.selectedBranch;
-    app.up(envVars);
-  },
-
-  up: function (envVars) {
+  up: function () {
     app.clearAndDisableTabs();
     // update status
     document.getElementById('log-loading').textContent = "Preparing your environment...please wait...";
@@ -296,8 +246,7 @@ var app = {
     var json = JSON.stringify({
       claimToken: app.claimToken,
       repo: app.repo,
-      branch: app.branch,
-      envVars: envVars
+      branch: app.branch
     });
     request.onload = function () {
       document.getElementById('repo-btn').disabled = false;
